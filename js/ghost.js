@@ -167,6 +167,9 @@ class Ghost {
     this.path = null;
     this.pathTimer = 0;
 
+    // Configurable durations (allow per-level override from PacManMode)
+    this.scatterDuration = SCATTER_DURATION;
+
     // Scatter corners (resolve dynamic values)
     this.scatterTarget = this.#resolveScatterCorner(personality, maze);
 
@@ -199,7 +202,7 @@ class Ghost {
     this.stateTimer += dt;
 
     if (this.state === GHOST_STATES.SCATTER) {
-      if (this.stateTimer >= SCATTER_DURATION) {
+      if (this.stateTimer >= this.scatterDuration) {
         this.state = GHOST_STATES.CHASE;
         this.stateTimer = 0;
       }
@@ -273,7 +276,7 @@ class Ghost {
   getCurrentSpeed() {
     if (this.state === GHOST_STATES.FRIGHTENED) return GHOST_SPEEDS.FRIGHTENED;
     if (this.state === GHOST_STATES.EATEN) return GHOST_SPEEDS.EATEN;
-    return GHOST_SPEEDS.NORMAL;
+    return this.baseSpeed;
   }
 
   // ── Chase Targeting ───────────────────────────────────────

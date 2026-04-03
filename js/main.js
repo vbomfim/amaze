@@ -25,6 +25,7 @@ import {
   getButtonAtPoint,
   getHoveredButton,
 } from './screens.js';
+import { PacManMode } from './pacman-mode.js';
 
 /** Game configuration constants */
 const CONFIG = {
@@ -101,6 +102,9 @@ class Game {
     this.gsm = new GameStateManager({ storage: localStorage });
     this.gsm.load();
 
+    // PAC-MAN mode instance (created on first entry) [Phase 3]
+    this.pacmanMode = null;
+
     this.#setupCanvas();
     this.renderer = new RaycastRenderer(this.canvas);
     // Cache HUD instance — avoid allocating every frame [Fix 3]
@@ -165,6 +169,8 @@ class Game {
         else if (state === 'victory') this._victorySelection = hovered;
         else if (state === 'levelComplete') this._levelCompleteSelection = hovered;
         this.canvas.style.cursor = 'pointer';
+      } else if (this.gsm.gameState === 'pacman' && this.pacmanMode && this.pacmanMode.handleHover(cx, cy)) {
+        this.canvas.style.cursor = 'pointer';
       } else {
         this.canvas.style.cursor = 'default';
       }
@@ -223,6 +229,11 @@ class Game {
       case 'levelSelect':
         this.#handleLevelSelectKey(e);
         break;
+      case 'pacman':
+        if (this.pacmanMode) {
+          this.pacmanMode.handleKey(e);
+        }
+        break;
     }
   }
 
@@ -241,13 +252,15 @@ class Game {
       this.#activateVictoryOption(btnIdx);
     } else if (state === 'levelComplete') {
       this.#activateLevelCompleteOption();
+    } else if (state === 'pacman' && this.pacmanMode) {
+      this.pacmanMode.handleClick(cx, cy);
     }
   }
 
   // ── Menu Key Handling [AC18] ──────────────────────────────
 
   #handleMenuKey(e) {
-    const maxItems = this.gsm.unlockedLevels > 1 ? 3 : 2;
+    const maxItems = this.gsm.unlockedLevels > 1 ? 4 : 3;
 
     if (e.code === 'ArrowUp') {
       this._menuSelection = (this._menuSelection - 1 + maxItems) % maxItems;
@@ -266,6 +279,8 @@ class Game {
       this.gsm.goToLevelSelect();
       this._levelSelectSelection = 1;
       this._levelSelectScroll = 0;
+    } else if (e.code === 'KeyP') {
+      this.#enterPacManMode();
     }
   }
 
@@ -279,6 +294,9 @@ class Game {
       this.gsm.continueGame(performance.now());
       this.#buildLevel();
     } else if (index === 2) {
+      // PAC-MAN Mode
+      this.#enterPacManMode();
+    } else if (index === 3) {
       // Level Select
       this.gsm.goToLevelSelect();
       this._levelSelectSelection = 1;
@@ -381,6 +399,26 @@ class Game {
       this.gsm.save();
       this._menuSelection = 0;
     }
+  }
+
+  // ── PAC-MAN Mode Entry [Phase 3] ──────────────────────────
+
+  /**
+   * Enter PAC-MAN mode — create PacManMode instance and switch state.
+   */
+  #enterPacManMode() {
+    if (!this.pacmanMode) {
+      this.pacmanMode = new PacManMode(this.canvas, this.audioManager, {
+        storage: localStorage,
+        onExit: () => {
+          this.gsm.gameState = 'menu';
+          this._menuSelection = 0;
+          if (this.player) this.player.enableMouseLook = false;
+        },
+      });
+    }
+    this.pacmanMode.start();
+    this.gsm.gameState = 'pacman';
   }
 
   // ── Level Complete Key Handling [AC14] ─────────────────────
@@ -601,6 +639,12 @@ class Game {
 
       case 'levelSelect':
         this.#renderLevelSelect();
+        break;
+
+      case 'pacman':
+        if (this.pacmanMode) {
+          this.pacmanMode.loop(timestamp);
+        }
         break;
     }
   }

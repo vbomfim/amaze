@@ -137,6 +137,9 @@ function drawStartScreen(ctx, w, h, data) {
   drawButton(ctx, 'Continue (C)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, data.canContinue, btnIdx);
   btnIdx++;
 
+  drawButton(ctx, 'PAC-MAN Mode (P)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true, btnIdx);
+  btnIdx++;
+
   if (data.canLevelSelect) {
     drawButton(ctx, 'Level Select (L)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true, btnIdx);
     btnIdx++;
