@@ -118,21 +118,21 @@ console.log('\n🧪 MazeGenerator — Exact boundary validation [EDGE]');
   );
 }
 
-console.log('\n🧪 MazeGenerator — Cell visited flag after generation [EDGE]');
+console.log('\n🧪 MazeGenerator — Cell visited flag cleaned up after generation [EDGE][Fix 16]');
 
 {
   const genV = new MazeGenerator({ width: 7, height: 7, seed: 42 });
   const gridV = genV.generate();
 
-  let allVisited = true;
+  let noneHaveVisited = true;
   for (let r = 0; r < 7; r++) {
     for (let c = 0; c < 7; c++) {
-      if (!gridV[r][c].visited) {
-        allVisited = false;
+      if ('visited' in gridV[r][c]) {
+        noneHaveVisited = false;
       }
     }
   }
-  assert(allVisited, '[EDGE] all cells marked as visited after generation');
+  assert(noneHaveVisited, '[EDGE][Fix 16] visited flag removed from all cells after generation');
 }
 
 console.log('\n🧪 MazeGenerator — Asymmetric dimensions [EDGE]');

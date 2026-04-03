@@ -12,7 +12,12 @@ export default [
         localStorage: "readonly",
         console: "readonly",
         performance: "readonly",
-        KeyboardEvent: "readonly"
+        KeyboardEvent: "readonly",
+        AbortController: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        Map: "readonly",
+        Set: "readonly"
       }
     },
     rules: {
@@ -34,7 +39,8 @@ export default [
       sourceType: "module",
       globals: {
         console: "readonly",
-        process: "readonly"
+        process: "readonly",
+        performance: "readonly"
       }
     },
     rules: {

@@ -19,6 +19,37 @@ const COLORS = {
   exitGlow: '#ffe066',
 };
 
+/**
+ * Pre-parsed { r, g, b } tuples for every COLORS entry.
+ * Eliminates hot-path parseInt/slice allocations in #applyShade. [Fix 2]
+ */
+const COLORS_RGB = Object.fromEntries(
+  Object.entries(COLORS).map(([key, hex]) => [
+    key,
+    {
+      r: parseInt(hex.slice(1, 3), 16),
+      g: parseInt(hex.slice(3, 5), 16),
+      b: parseInt(hex.slice(5, 7), 16),
+    },
+  ])
+);
+
+/** Named visual constants — replaces magic numbers [Fix 15] */
+const VISUAL = {
+  /** Minimum brightness so distant walls don't vanish entirely */
+  minShade: 0.15,
+  /** Maximum shade multiplier for bright edge accents */
+  maxShadeBoost: 1.2,
+  /** Distance at which walls fade to minimum shade */
+  shadeDropoffDistance: 12,
+  /** Column interval for wireframe accent lines */
+  accentColumnInterval: 4,
+  /** Opacity multiplier for wireframe accent fill */
+  accentOpacity: 0.3,
+  /** Dim fill multiplier for wall depth fill */
+  depthFillMultiplier: 0.15,
+};
+
 class RaycastRenderer {
   /**
    * @param {HTMLCanvasElement} canvas
@@ -29,8 +60,14 @@ class RaycastRenderer {
     this.width = canvas.width;
     this.height = canvas.height;
 
-    // Pre-allocate depth buffer for potential future use (minimap, sprites)
-    this.depthBuffer = new Float64Array(this.width);
+    // TODO: Add depthBuffer back when sprite rendering is implemented [YAGNI][Fix 11]
+    // Reusable hit-result object — avoids per-ray allocation [Fix 2]
+    this._hitResult = { distance: 0, side: 0, mapRow: 0, mapCol: 0 };
+
+    // Reverse lookup: hex value → COLORS key for pre-parsed RGB [Fix 2]
+    this._colorKeyCache = new Map(
+      Object.entries(COLORS).map(([key, hex]) => [hex, key])
+    );
   }
 
   /**
@@ -80,7 +117,6 @@ class RaycastRenderer {
       if (hit) {
         // Fix fisheye distortion: use perpendicular distance
         const perpDist = hit.distance * Math.cos(rayAngle - player.angle);
-        this.depthBuffer[col] = perpDist;
 
         // Calculate wall slice height (inversely proportional to distance)
         const sliceHeight = Math.min(this.height * 2, this.height / perpDist);
@@ -97,8 +133,8 @@ class RaycastRenderer {
           color = hit.side === 0 ? COLORS.wallNS : COLORS.wallEW;
         }
 
-        // Apply distance-based shading (fade to dark with distance)
-        const shade = Math.max(0.15, 1.0 - perpDist / 12);
+        // Apply distance-based shading (fade to dark with distance) [Fix 15]
+        const shade = Math.max(VISUAL.minShade, 1.0 - perpDist / VISUAL.shadeDropoffDistance);
 
         this.#drawWallSlice(col, sliceTop, sliceHeight, color, shade, isExit);
       }
@@ -108,6 +144,7 @@ class RaycastRenderer {
   /**
    * Cast a single ray using the DDA (Digital Differential Analysis) algorithm.
    * Efficient grid traversal — steps through cell boundaries one at a time.
+   * Writes into this._hitResult to avoid per-ray object allocation. [Fix 2]
    *
    * @param {number} ox — ray origin X
    * @param {number} oy — ray origin Y
@@ -150,6 +187,7 @@ class RaycastRenderer {
     // DDA loop
     let side = 0; // 0 = hit vertical (N/S facing) wall, 1 = hit horizontal (E/W facing) wall
     const maxSteps = 200;
+    const hit = this._hitResult;
 
     for (let i = 0; i < maxSteps; i++) {
       // Step to next cell boundary
@@ -162,11 +200,12 @@ class RaycastRenderer {
 
         // Check wall between prevCol and mapCol
         if (this.#hasWallBetweenCols(grid, mapRow, prevCol, mapCol)) {
-          // Distance to this wall
-          const dist = side === 0
-            ? (sideDistX - deltaDistX)
-            : (sideDistY - deltaDistY);
-          return { distance: dist, side, mapRow, mapCol };
+          // side is always 0 here — use direct assignment [Fix 10]
+          hit.distance = sideDistX - deltaDistX;
+          hit.side = 0;
+          hit.mapRow = mapRow;
+          hit.mapCol = mapCol;
+          return hit;
         }
       } else {
         // Crossing a horizontal boundary (north/south edge)
@@ -177,19 +216,24 @@ class RaycastRenderer {
 
         // Check wall between prevRow and mapRow
         if (this.#hasWallBetweenRows(grid, prevRow, mapRow, mapCol)) {
-          const dist = side === 0
-            ? (sideDistX - deltaDistX)
-            : (sideDistY - deltaDistY);
-          return { distance: dist, side, mapRow, mapCol };
+          // side is always 1 here — use direct assignment [Fix 10]
+          hit.distance = sideDistY - deltaDistY;
+          hit.side = 1;
+          hit.mapRow = mapRow;
+          hit.mapCol = mapCol;
+          return hit;
         }
       }
 
       // Out of bounds = hit outer wall
       if (mapRow < 0 || mapRow >= grid.length || mapCol < 0 || mapCol >= grid[0].length) {
-        const dist = side === 0
+        hit.distance = side === 0
           ? (sideDistX - deltaDistX)
           : (sideDistY - deltaDistY);
-        return { distance: dist, side, mapRow: Math.max(0, Math.min(mapRow, grid.length - 1)), mapCol: Math.max(0, Math.min(mapCol, grid[0].length - 1)) };
+        hit.side = side;
+        hit.mapRow = Math.max(0, Math.min(mapRow, grid.length - 1));
+        hit.mapCol = Math.max(0, Math.min(mapCol, grid[0].length - 1));
+        return hit;
       }
     }
 
@@ -261,16 +305,16 @@ class RaycastRenderer {
       // Exit: solid glowing column
       ctx.fillStyle = this.#applyShade(COLORS.exit, shade);
       ctx.fillRect(x, top, 1, height);
-      // Add bright edge
-      ctx.fillStyle = this.#applyShade(COLORS.exitGlow, shade * 1.2);
+      // Add bright edge [Fix 15]
+      ctx.fillStyle = this.#applyShade(COLORS.exitGlow, shade * VISUAL.maxShadeBoost);
       ctx.fillRect(x, top, 1, 2);
       ctx.fillRect(x, top + height - 2, 1, 2);
     } else {
       // Wireframe style: draw edges of the wall slice
       const shadedColor = this.#applyShade(color, shade);
 
-      // Fill with a very dim version for depth
-      ctx.fillStyle = this.#applyShade(color, shade * 0.15);
+      // Fill with a very dim version for depth [Fix 15]
+      ctx.fillStyle = this.#applyShade(color, shade * VISUAL.depthFillMultiplier);
       ctx.fillRect(x, top, 1, height);
 
       // Top and bottom edge (bright)
@@ -278,9 +322,9 @@ class RaycastRenderer {
       ctx.fillRect(x, top, 1, 1);
       ctx.fillRect(x, top + height - 1, 1, 1);
 
-      // Add occasional vertical accent lines for wireframe feel
-      if (x % 4 === 0) {
-        ctx.globalAlpha = shade * 0.3;
+      // Add occasional vertical accent lines for wireframe feel [Fix 15]
+      if (x % VISUAL.accentColumnInterval === 0) {
+        ctx.globalAlpha = shade * VISUAL.accentOpacity;
         ctx.fillStyle = color;
         ctx.fillRect(x, top, 1, height);
         ctx.globalAlpha = 1.0;
@@ -289,17 +333,29 @@ class RaycastRenderer {
   }
 
   /**
-   * Apply brightness shade to a hex color.
-   * @param {string} hex — color like '#00cccc'
+   * Apply brightness shade to a color using pre-parsed RGB tuples. [Fix 2]
+   * Pure arithmetic — no parseInt/slice on hot path.
+   * @param {string} hex — color key matching a COLORS entry (e.g. '#00cccc')
    * @param {number} shade — 0..1 brightness multiplier
    * @returns {string} shaded color as rgb() string
    */
   #applyShade(hex, shade) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
+    const rgb = COLORS_RGB[this._colorKeyCache.get(hex)] || this.#parseHexFallback(hex);
     const s = Math.min(1, Math.max(0, shade));
-    return `rgb(${Math.floor(r * s)},${Math.floor(g * s)},${Math.floor(b * s)})`;
+    return `rgb(${rgb.r * s | 0},${rgb.g * s | 0},${rgb.b * s | 0})`;
+  }
+
+  /**
+   * Fallback for hex values not in COLORS_RGB (should not happen in normal flow).
+   * @param {string} hex
+   * @returns {{ r: number, g: number, b: number }}
+   */
+  #parseHexFallback(hex) {
+    return {
+      r: parseInt(hex.slice(1, 3), 16),
+      g: parseInt(hex.slice(3, 5), 16),
+      b: parseInt(hex.slice(5, 7), 16),
+    };
   }
 
   /**
@@ -339,7 +395,8 @@ class RaycastRenderer {
   }
 
   /**
-   * Draw a mini-compass showing player direction (HUD element).
+   * Draw a mini heading-indicator showing player direction (HUD element). [Fix 4]
+   * Note: this is a heading indicator, not a compass — no cardinal labels.
    * @param {number} angle — player angle in radians
    */
   drawCompass(angle) {
@@ -365,12 +422,6 @@ class RaycastRenderer {
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.cos(angle) * r * 0.8, cy + Math.sin(angle) * r * 0.8);
     ctx.stroke();
-
-    // N label
-    ctx.fillStyle = '#00cccc';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('N', cx, cy - r - 5);
 
     ctx.globalAlpha = 1.0;
     ctx.restore();
@@ -472,4 +523,4 @@ class RaycastRenderer {
   }
 }
 
-export { RaycastRenderer, COLORS };
+export { RaycastRenderer, COLORS, COLORS_RGB, VISUAL };

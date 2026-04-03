@@ -79,6 +79,7 @@ class MazeGenerator {
     const grid = this.#createGrid();
     this.#carve(grid);
     this.#openEntryAndExit(grid);
+    this.#cleanupVisited(grid);
     return grid;
   }
 
@@ -168,6 +169,18 @@ class MazeGenerator {
     grid[0][0].north = false;
     // Exit: bottom-right corner — open south wall to signal exit
     grid[this.height - 1][this.width - 1].south = false;
+  }
+
+  /**
+   * Remove the internal `visited` flag from all cells after generation.
+   * This is a DFS implementation detail that should not leak to consumers. [Fix 16]
+   */
+  #cleanupVisited(grid) {
+    for (let row = 0; row < this.height; row++) {
+      for (let col = 0; col < this.width; col++) {
+        delete grid[row][col].visited;
+      }
+    }
   }
 }
 

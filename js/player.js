@@ -7,6 +7,12 @@
  * [TDD] [CLEAN-CODE] [SOLID]
  */
 
+/** Keys that the game handles — prevent default browser behavior [Fix 3] */
+const GAME_KEYS = new Set([
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space',
+]);
+
 class PlayerController {
   /**
    * @param {Object} config
@@ -32,15 +38,21 @@ class PlayerController {
 
   /**
    * Bind keyboard event listeners to the document.
+   * Uses AbortController so listeners can be removed cleanly. [Fix 1]
+   * Prevents default browser scrolling for game-relevant keys. [Fix 3]
+   *
    * @param {Document} doc
+   * @param {{ signal?: AbortSignal }} [options] — pass { signal } from an AbortController
    */
-  bindInput(doc) {
+  bindInput(doc, options) {
+    const opts = options || {};
     doc.addEventListener('keydown', (e) => {
+      if (GAME_KEYS.has(e.code)) e.preventDefault();
       this.keys.add(e.code);
-    });
+    }, opts);
     doc.addEventListener('keyup', (e) => {
       this.keys.delete(e.code);
-    });
+    }, opts);
   }
 
   /**
@@ -160,4 +172,4 @@ class PlayerController {
   }
 }
 
-export { PlayerController };
+export { PlayerController, GAME_KEYS };

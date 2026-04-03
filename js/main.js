@@ -17,6 +17,7 @@ const CONFIG = {
   canvasMaxWidth: 1200,
   aspectRatio: 16 / 9,
   levelCompleteDelay: 2000, // ms before auto-generating next maze
+  resizeDebounceMs: 150, // debounce delay for resize handler [Fix 7]
 };
 
 class Game {
@@ -36,6 +37,15 @@ class Game {
 
     this.exitRow = 0;
     this.exitCol = 0;
+
+    /** AbortController for player input listeners — aborted on level change [Fix 1] */
+    this._inputController = null;
+    /** requestAnimationFrame handle — stored so loop can be cancelled [Fix 6] */
+    this._rafHandle = null;
+    /** Cached paused-screen ImageData — avoids raycasting while paused [Fix 5] */
+    this._pausedImageData = null;
+    /** Resize debounce timer [Fix 7] */
+    this._resizeTimer = null;
 
     this.#setupCanvas();
     this.renderer = new RaycastRenderer(this.canvas);
@@ -62,6 +72,7 @@ class Game {
     // Resume on any keypress when paused
     document.addEventListener('keydown', (e) => {
       if (this.state === 'paused') {
+        this._pausedImageData = null; // Invalidate cached frame [Fix 5]
         this.state = 'playing';
         return;
       }
@@ -71,17 +82,22 @@ class Game {
       }
     });
 
-    // Handle window resize
+    // Handle window resize — debounced [Fix 7]
     window.addEventListener('resize', () => {
-      this.#setupCanvas();
-      this.renderer = new RaycastRenderer(this.canvas);
+      clearTimeout(this._resizeTimer);
+      this._resizeTimer = setTimeout(() => {
+        this.#setupCanvas();
+        this.renderer = new RaycastRenderer(this.canvas);
+        this._pausedImageData = null; // Invalidate cached frame [Fix 5]
+      }, CONFIG.resizeDebounceMs);
     });
   }
 
   /** Generate a new maze and reset the player. */
   #startLevel() {
     this.level++;
-    const seed = Date.now() + this.level;
+    // Fold level into lower bits to avoid Date.now() truncation [Fix 13]
+    const seed = (Date.now() ^ (this.level * 2654435761)) >>> 0;
     const gen = new MazeGenerator({
       width: CONFIG.mazeWidth,
       height: CONFIG.mazeHeight,
@@ -92,6 +108,12 @@ class Game {
     this.exitRow = CONFIG.mazeHeight - 1;
     this.exitCol = CONFIG.mazeWidth - 1;
 
+    // Abort previous player's input listeners before creating a new player [Fix 1]
+    if (this._inputController) {
+      this._inputController.abort();
+    }
+    this._inputController = new AbortController();
+
     // Place player at center of entry cell (0,0), facing east
     this.player = new PlayerController({
       x: 0.5,
@@ -99,7 +121,7 @@ class Game {
       angle: 0,
       grid: this.grid,
     });
-    this.player.bindInput(document);
+    this.player.bindInput(document, { signal: this._inputController.signal });
 
     this.state = 'playing';
     this.lastTime = performance.now();
@@ -107,7 +129,7 @@ class Game {
 
   /** Main game loop — called via requestAnimationFrame. */
   loop(timestamp) {
-    requestAnimationFrame((t) => this.loop(t));
+    this._rafHandle = requestAnimationFrame((t) => this.loop(t));
 
     switch (this.state) {
       case 'menu':
@@ -128,9 +150,9 @@ class Game {
     }
   }
 
-  /** Render the start menu screen. */
+  /** Render the start menu screen. [Fix 14] — uses this.renderer.ctx */
   #renderMenu() {
-    const ctx = this.canvas.getContext('2d');
+    const ctx = this.renderer.ctx;
     ctx.fillStyle = '#0d0d2b';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -153,8 +175,8 @@ class Game {
     this.renderer.drawCompass(this.player.angle);
     this.renderer.drawMinimap(this.grid, this.player, this.exitRow, this.exitCol);
 
-    // Draw level indicator
-    const ctx = this.canvas.getContext('2d');
+    // Draw level indicator [Fix 14] — uses this.renderer.ctx
+    const ctx = this.renderer.ctx;
     ctx.save();
     ctx.font = '14px monospace';
     ctx.fillStyle = 'rgba(0, 204, 204, 0.5)';
@@ -169,11 +191,19 @@ class Game {
     }
   }
 
-  /** Render the paused screen (overlay on top of last frame). */
+  /**
+   * Render the paused screen using cached ImageData [Fix 5].
+   * Only raycast once when entering pause; subsequent frames use putImageData.
+   */
   #renderPaused() {
-    // Re-render the last frame underneath
-    if (this.grid && this.player) {
+    const ctx = this.renderer.ctx;
+    if (!this._pausedImageData && this.grid && this.player) {
+      // First paused frame: render once and capture
       this.renderer.render(this.player, this.grid, this.exitRow, this.exitCol);
+      this._pausedImageData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+    } else if (this._pausedImageData) {
+      // Subsequent frames: restore cached image
+      ctx.putImageData(this._pausedImageData, 0, 0);
     }
     this.renderer.drawOverlayText('PAUSED', '#00cccc', 48);
     this.renderer.drawSubtitle('Press any key to resume', '#888888', 18);
@@ -192,9 +222,22 @@ class Game {
     }
   }
 
-  /** Start the game. */
+  /**
+   * Start the game loop. Guarded against double-start. [Fix 6]
+   */
   start() {
-    requestAnimationFrame((t) => this.loop(t));
+    if (this._rafHandle) return;
+    this._rafHandle = requestAnimationFrame((t) => this.loop(t));
+  }
+
+  /**
+   * Stop the game loop. [Fix 6]
+   */
+  stop() {
+    if (this._rafHandle) {
+      cancelAnimationFrame(this._rafHandle);
+      this._rafHandle = null;
+    }
   }
 }
 
