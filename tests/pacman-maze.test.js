@@ -451,6 +451,85 @@ console.log('\n🧪 PacManMazeGenerator — Multiple valid sizes');
   assert(allOk, `all sizes ${sizes.join(', ')} generate valid connected mazes`);
 }
 
+// ── Dead-End Removal Effectiveness [Fix 8] ─────────────────────
+
+console.log('\n🧪 PacManMazeGenerator — Dead-end removal effectiveness');
+
+{
+  const gen = new PacManMazeGenerator({ width: 21, height: 21, seed: 42 });
+  const result = gen.generate();
+  const map = result.map;
+
+  // Count cells with exactly 1 open cardinal neighbor (dead ends)
+  let deadEndCount = 0;
+  let openCount = 0;
+
+  for (let r = 1; r < map.length - 1; r++) {
+    for (let c = 1; c < map[0].length - 1; c++) {
+      if (map[r][c] !== 0) continue;
+      openCount++;
+
+      let openNeighbors = 0;
+      if (map[r - 1][c] === 0) openNeighbors++;
+      if (map[r + 1][c] === 0) openNeighbors++;
+      if (map[r][c - 1] === 0) openNeighbors++;
+      if (map[r][c + 1] === 0) openNeighbors++;
+
+      if (openNeighbors === 1) deadEndCount++;
+    }
+  }
+
+  const deadEndRatio = deadEndCount / openCount;
+  assert(deadEndRatio <= 0.1, `dead ends ≤ 10% of open tiles (${deadEndCount}/${openCount} = ${(deadEndRatio * 100).toFixed(1)}%)`);
+}
+
+{
+  // Test with different seed and larger maze
+  const gen = new PacManMazeGenerator({ width: 31, height: 31, seed: 7 });
+  const result = gen.generate();
+  const map = result.map;
+
+  let deadEndCount = 0;
+  let openCount = 0;
+
+  for (let r = 1; r < map.length - 1; r++) {
+    for (let c = 1; c < map[0].length - 1; c++) {
+      if (map[r][c] !== 0) continue;
+      openCount++;
+
+      let openNeighbors = 0;
+      if (map[r - 1][c] === 0) openNeighbors++;
+      if (map[r + 1][c] === 0) openNeighbors++;
+      if (map[r][c - 1] === 0) openNeighbors++;
+      if (map[r][c + 1] === 0) openNeighbors++;
+
+      if (openNeighbors === 1) deadEndCount++;
+    }
+  }
+
+  const deadEndRatio = deadEndCount / openCount;
+  assert(deadEndRatio <= 0.1, `31×31: dead ends ≤ 10% (${deadEndCount}/${openCount} = ${(deadEndRatio * 100).toFixed(1)}%)`);
+}
+
+// ── Dot positions don't overlap power pellets [Fix 3] ──────────
+
+console.log('\n🧪 PacManMazeGenerator — Dots do not overlap power pellets');
+
+{
+  const gen = new PacManMazeGenerator({ width: 21, height: 21, seed: 42 });
+  const result = gen.generate();
+
+  const pelletKeys = new Set(result.powerPelletPositions.map(([r, c]) => `${r},${c}`));
+  let hasOverlap = false;
+  for (const [r, c] of result.dotPositions) {
+    if (pelletKeys.has(`${r},${c}`)) {
+      hasOverlap = true;
+      break;
+    }
+  }
+  assert(!hasOverlap, 'no dot positions overlap with power pellet positions');
+}
+
 // ── Summary ────────────────────────────────────────────────────
 
 console.log(`\n${'─'.repeat(50)}`);

@@ -625,11 +625,16 @@ class Game {
     // Update player position
     this.player.update(dt);
 
+    // Wall bump audio — play when player collided with a wall [Fix 4]
+    if (this.player.collided) {
+      this.audioManager.playWallBump();
+    }
+
     // Footstep audio — play when player moves >0.1 units since last footstep [Issue #4]
     const footDx = this.player.x - this._lastFootstepX;
     const footDy = this.player.y - this._lastFootstepY;
-    const footDist = Math.sqrt(footDx * footDx + footDy * footDy);
-    if (footDist > 0.1) {
+    const footDist = footDx * footDx + footDy * footDy;
+    if (footDist > 0.01) {
       this.audioManager.playFootstep();
       this._lastFootstepX = this.player.x;
       this._lastFootstepY = this.player.y;

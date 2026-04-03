@@ -108,8 +108,8 @@ class SpriteRenderer {
     const typeDef = SPRITE_TYPES[sprite.type];
     if (!typeDef) return;
 
-    // Screen X position
-    const screenX = Math.floor(this.width / 2 + normAngle * projDist);
+    // Screen X position — use tan(angle) for correct perspective projection [Fix 1]
+    const screenX = Math.floor(this.width / 2 + Math.tan(normAngle) * projDist);
 
     // Screen size based on distance (same scale as walls)
     const spriteScreenSize = Math.floor((typeDef.size / dist) * projDist);
@@ -126,10 +126,13 @@ class SpriteRenderer {
     const startCol = screenX - halfSize;
     const endCol = screenX + halfSize;
 
+    // Perpendicular sprite distance for depth comparison (matches wall depth buffer) [Fix 2]
+    const perpSpriteDist = dist * Math.cos(normAngle);
+
     // Check if any column is visible (not occluded by walls)
     let hasVisibleColumn = false;
     for (let col = Math.max(0, startCol); col < Math.min(this.width, endCol); col++) {
-      if (depthBuffer[col] > dist) {
+      if (depthBuffer[col] > perpSpriteDist) {
         hasVisibleColumn = true;
         break;
       }

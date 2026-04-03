@@ -195,13 +195,13 @@ class AudioManager {
     osc2.stop(t + 0.12);
   }
 
-  /** Descending sawtooth 500→200Hz, looping while active */
+  /** Descending sawtooth 500→200Hz single sweep while active [Fix 6] — renamed from playPowerUpSiren */
   playPowerUpSiren() {
     if (!this.#canPlay()) return;
     this.stopPowerUpSiren();
     const { osc, gain } = this.#createOscGain('sawtooth', 500, 0.1);
     const t = this._ctx.currentTime;
-    // Create descending sweep that loops — we approximate with a long ramp
+    // Single descending frequency sweep (not a true siren loop)
     osc.frequency.setValueAtTime(500, t);
     osc.frequency.linearRampToValueAtTime(200, t + 2);
     osc.start(t);
@@ -243,7 +243,7 @@ class AudioManager {
     ], 'sine', 0.25);
   }
 
-  /** Low oscillating sine 150Hz, subtle background loop */
+  /** Low sine 150Hz sustained tone while active [Fix 6] — renamed from playGhostSiren */
   playGhostSiren() {
     if (!this.#canPlay()) return;
     this.stopGhostSiren();

@@ -91,8 +91,8 @@ class PacManMazeGenerator {
     map[startRow][startCol] = 0;
 
     // Generate dot and power pellet positions
-    const dotPositions = this.#generateDotPositions(map, ghostHouse, startRow, startCol);
     const powerPelletPositions = this.#generatePowerPelletPositions(map);
+    const dotPositions = this.#generateDotPositions(map, ghostHouse, startRow, startCol, powerPelletPositions);
 
     return {
       map,
@@ -397,15 +397,18 @@ class PacManMazeGenerator {
     }
   }
 
-  /** Carve a path from a disconnected tile to the main component */
+  /** Carve a path from a disconnected tile to the main component [Fix 5] — O(n) parent-pointer BFS */
   #connectToMainComponent(map, fromR, fromC, mainVisited) {
     // BFS from the disconnected tile, allowing wall removal, until we reach main component
-    const visited = new Set([`${fromR},${fromC}`]);
-    const queue = [[fromR, fromC, []]];
+    const cameFrom = new Map();
+    const startKey = `${fromR},${fromC}`;
+    const visited = new Set([startKey]);
+    const queue = [[fromR, fromC]];
     const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
 
     while (queue.length > 0) {
-      const [r, c, path] = queue.shift();
+      const [r, c] = queue.shift();
+      const currentKey = `${r},${c}`;
 
       for (const [dr, dc] of dirs) {
         const nr = r + dr;
@@ -416,20 +419,23 @@ class PacManMazeGenerator {
         if (visited.has(key)) continue;
 
         visited.add(key);
-        const newPath = [...path, [nr, nc]];
+        cameFrom.set(key, currentKey);
 
         if (mainVisited.has(key)) {
-          // Found path to main component — carve it
-          for (const [pr, pc] of newPath) {
-            map[pr][pc] = 0;
-            mainVisited.add(`${pr},${pc}`);
+          // Found path to main component — walk cameFrom backwards to reconstruct and carve
+          let walkKey = key;
+          while (walkKey && walkKey !== startKey) {
+            const [wr, wc] = walkKey.split(',').map(Number);
+            map[wr][wc] = 0;
+            mainVisited.add(walkKey);
+            walkKey = cameFrom.get(walkKey);
           }
           // Also add original disconnected region
           this.#floodAdd(map, fromR, fromC, mainVisited);
           return;
         }
 
-        queue.push([nr, nc, newPath]);
+        queue.push([nr, nc]);
       }
     }
   }
@@ -457,10 +463,13 @@ class PacManMazeGenerator {
 
   // ── Dot & Power Pellet Placement ───────────────────────────
 
-  /** Place dots on every open tile except ghost house interior and player start */
-  #generateDotPositions(map, ghostHouse, startRow, startCol) {
+  /** Place dots on every open tile except ghost house interior, player start, and power pellet positions [Fix 3] */
+  #generateDotPositions(map, ghostHouse, startRow, startCol, powerPelletPositions) {
     const dots = [];
     const gh = ghostHouse;
+
+    // Build a Set of power pellet positions for O(1) lookup
+    const pelletKeys = new Set(powerPelletPositions.map(([r, c]) => `${r},${c}`));
 
     for (let r = 1; r < this.height - 1; r++) {
       for (let c = 1; c < this.width - 1; c++) {
@@ -468,6 +477,8 @@ class PacManMazeGenerator {
         if (r === startRow && c === startCol) continue;
         // Skip ghost house interior
         if (r >= gh.row && r < gh.row + gh.height && c >= gh.col && c < gh.col + gh.width) continue;
+        // Skip power pellet positions
+        if (pelletKeys.has(`${r},${c}`)) continue;
         dots.push([r, c]);
       }
     }

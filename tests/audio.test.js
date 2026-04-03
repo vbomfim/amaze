@@ -304,6 +304,152 @@ console.log('\n🧪 AudioManager — Resumes suspended context on init');
   assert(am._ctx._resumed === true, 'calls resume() on AudioContext');
 }
 
+// ── Behavioral assertions: oscillator lifecycle [Fix 9] ────────
+
+console.log('\n🧪 AudioManager — Oscillator start/stop verified');
+
+{
+  // Track all created oscillators
+  const createdOscs = [];
+  class TrackingAudioContext extends MockAudioContext {
+    createOscillator() {
+      const osc = new MockOscillatorNode();
+      createdOscs.push(osc);
+      return osc;
+    }
+  }
+
+  const am = new AudioManager({ AudioContextClass: TrackingAudioContext });
+  am.init();
+
+  createdOscs.length = 0;
+  am.playFootstep();
+  assert(createdOscs.length > 0, 'playFootstep creates oscillator(s)');
+  assert(createdOscs[0]._started === true, 'playFootstep oscillator was started');
+  assert(createdOscs[0]._stopped === true, 'playFootstep oscillator was stopped (scheduled)');
+}
+
+{
+  const createdOscs = [];
+  class TrackingAudioContext extends MockAudioContext {
+    createOscillator() {
+      const osc = new MockOscillatorNode();
+      createdOscs.push(osc);
+      return osc;
+    }
+  }
+
+  const am = new AudioManager({ AudioContextClass: TrackingAudioContext });
+  am.init();
+
+  createdOscs.length = 0;
+  am.playWallBump();
+  assert(createdOscs.length > 0, 'playWallBump creates oscillator(s)');
+  assert(createdOscs[0]._started === true, 'playWallBump oscillator was started');
+}
+
+{
+  const createdOscs = [];
+  class TrackingAudioContext extends MockAudioContext {
+    createOscillator() {
+      const osc = new MockOscillatorNode();
+      createdOscs.push(osc);
+      return osc;
+    }
+  }
+
+  const am = new AudioManager({ AudioContextClass: TrackingAudioContext });
+  am.init();
+
+  createdOscs.length = 0;
+  am.playWakaWaka();
+  assert(createdOscs.length === 2, `playWakaWaka creates 2 oscillators (got ${createdOscs.length})`);
+  assert(createdOscs[0]._started === true, 'first waka oscillator was started');
+  assert(createdOscs[1]._started === true, 'second waka oscillator was started');
+}
+
+console.log('\n🧪 AudioManager — Muted creates no nodes');
+
+{
+  const createdOscs = [];
+  class TrackingAudioContext extends MockAudioContext {
+    createOscillator() {
+      const osc = new MockOscillatorNode();
+      createdOscs.push(osc);
+      return osc;
+    }
+  }
+
+  const am = new AudioManager({ AudioContextClass: TrackingAudioContext });
+  am.init();
+  am.muted = true;
+
+  createdOscs.length = 0;
+  am.playFootstep();
+  am.playWallBump();
+  am.playWakaWaka();
+  am.playGhostEaten();
+  am.playDeath();
+  assert(createdOscs.length === 0, 'muted mode creates 0 oscillator nodes');
+}
+
+console.log('\n🧪 AudioManager — Frequency values set correctly');
+
+{
+  const createdOscs = [];
+  class TrackingAudioContext extends MockAudioContext {
+    createOscillator() {
+      const osc = new MockOscillatorNode();
+      createdOscs.push(osc);
+      return osc;
+    }
+  }
+
+  const am = new AudioManager({ AudioContextClass: TrackingAudioContext });
+  am.init();
+
+  createdOscs.length = 0;
+  am.playFootstep();
+  assert(createdOscs[0].frequency.value === 80, 'footstep frequency is 80Hz');
+  assert(createdOscs[0].type === 'square', 'footstep oscillator type is square');
+
+  createdOscs.length = 0;
+  am.playWallBump();
+  assert(createdOscs[0].frequency.value === 60, 'wall bump frequency is 60Hz');
+  assert(createdOscs[0].type === 'sine', 'wall bump oscillator type is sine');
+}
+
+console.log('\n🧪 AudioManager — Looping siren oscillator lifecycle');
+
+{
+  const createdOscs = [];
+  class TrackingAudioContext extends MockAudioContext {
+    createOscillator() {
+      const osc = new MockOscillatorNode();
+      createdOscs.push(osc);
+      return osc;
+    }
+  }
+
+  const am = new AudioManager({ AudioContextClass: TrackingAudioContext });
+  am.init();
+
+  createdOscs.length = 0;
+  am.playPowerUpSiren();
+  assert(createdOscs.length === 1, 'playPowerUpSiren creates 1 oscillator');
+  assert(createdOscs[0]._started === true, 'power-up siren oscillator started');
+  assert(createdOscs[0]._stopped === false, 'power-up siren oscillator NOT stopped yet (continuous)');
+  am.stopPowerUpSiren();
+  assert(createdOscs[0]._stopped === true, 'power-up siren oscillator stopped after stopPowerUpSiren()');
+
+  createdOscs.length = 0;
+  am.playGhostSiren();
+  assert(createdOscs.length === 1, 'playGhostSiren creates 1 oscillator');
+  assert(createdOscs[0]._started === true, 'ghost siren oscillator started');
+  am.stopGhostSiren();
+  assert(createdOscs[0]._stopped === true, 'ghost siren oscillator stopped after stopGhostSiren()');
+}
+
 // ── Summary ────────────────────────────────────────────────────
 
 console.log(`\n${'─'.repeat(50)}`);

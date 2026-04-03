@@ -51,6 +51,9 @@ class PlayerController {
     /** Set to true when game is in 'playing' state */
     this.enableMouseLook = false;
 
+    /** True when the last update() was blocked by a wall collision [Fix 4] */
+    this.collided = false;
+
     /** @type {Set<string>} currently pressed keys */
     this.keys = new Set();
   }
@@ -103,6 +106,7 @@ class PlayerController {
    * @param {number} dt — delta time in seconds
    */
   update(dt) {
+    this.collided = false;
     this.#handleRotation(dt);
     this.#handleMovement(dt);
   }
@@ -154,7 +158,7 @@ class PlayerController {
 
     if (dx === 0 && dy === 0) return;
 
-    // Wall sliding: try full move, then individual axes
+    // Wall sliding: try full move, then individual axes [Fix 4] — track collision
     const newX = this.x + dx;
     const newY = this.y + dy;
 
@@ -163,8 +167,12 @@ class PlayerController {
       this.y = newY;
     } else if (!this.#collides(newX, this.y)) {
       this.x = newX;
+      this.collided = true;
     } else if (!this.#collides(this.x, newY)) {
       this.y = newY;
+      this.collided = true;
+    } else {
+      this.collided = true;
     }
   }
 
