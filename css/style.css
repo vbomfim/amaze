@@ -27,8 +27,6 @@ body {
 
 #game-canvas {
   display: block;
-  border: 1px solid #00444480;
-  border-radius: 2px;
   image-rendering: pixelated;
 }
 
@@ -36,11 +34,15 @@ body {
    don't render on <canvas> elements */
 
 .controls-hint {
-  margin-top: 12px;
-  font-size: 12px;
-  color: #00666680;
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #00666640;
   text-align: center;
   user-select: none;
+  pointer-events: none;
 }
 
 .exit-hint {

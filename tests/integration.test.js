@@ -314,7 +314,7 @@ console.log('\n🧪 Integration — Player can reach exit via BFS path [AC-1][AC
     // Walk the player through each consecutive pair of cells in the path.
     // For each step: position at 'from' center, aim at 'to' center, move.
     // Use short movement bursts (just enough to cross 1 cell = 1.0 unit).
-    const player = new PlayerController({ x: 0.5, y: 0.5, angle: 0, grid });
+    const player = new PlayerController({ x: 0.5, y: 0.5, angle: 0, grid, tileMap: grid });
     let blocked = false;
     let blockedStep = -1;
 
@@ -485,7 +485,7 @@ console.log('\n🧪 Integration — Coordinate system alignment [BOUNDARY]');
   const grid = gen.generate();
 
   // Verify: grid[row][col] → player.y maps to row, player.x maps to col
-  const player = new PlayerController({ x: 3.5, y: 2.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 2.5, angle: 0, grid, tileMap: grid });
 
   assert(
     Math.floor(player.y) === 2 && Math.floor(player.x) === 3,
@@ -493,7 +493,7 @@ console.log('\n🧪 Integration — Coordinate system alignment [BOUNDARY]');
   );
 
   // isAtExit uses (row, col) = (floor(y), floor(x))
-  const exitPlayer = new PlayerController({ x: 6.5, y: 6.5, angle: 0, grid });
+  const exitPlayer = new PlayerController({ x: 6.5, y: 6.5, angle: 0, grid, tileMap: grid });
   assert(
     exitPlayer.isAtExit(6, 6),
     '[BOUNDARY] isAtExit(6,6) with player at (x=6.5, y=6.5) — coordinate alignment verified'

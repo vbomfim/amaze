@@ -11,6 +11,7 @@
 const GAME_KEYS = new Set([
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space',
+  'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight',
 ]);
 
 class PlayerController {
@@ -19,18 +20,36 @@ class PlayerController {
    * @param {number} config.x — starting X position (world units)
    * @param {number} config.y — starting Y position (world units)
    * @param {number} config.angle — starting angle in radians (0 = east)
-   * @param {Cell[][]} config.grid — maze grid for collision detection
+   * @param {number[][]} [config.tileMap] — tile map: 0=open, 1=wall
+   * @param {Cell[][]} [config.grid] — legacy cell grid (converted to simple tile map)
    */
-  constructor({ x, y, angle, grid }) {
+  constructor({ x, y, angle, tileMap, grid }) {
     this.x = x;
     this.y = y;
     this.angle = angle;
-    this.grid = grid;
+
+    // Support both tile map and legacy cell grid
+    if (tileMap) {
+      this.tileMap = tileMap;
+    } else if (grid) {
+      // Legacy: build a simple blocked-tile lookup from cell walls
+      this.tileMap = grid;
+      this._legacyGrid = true;
+    }
 
     this.moveSpeed = 3.0;
     this.turnSpeed = 2.5;
-    this.fov = (60 * Math.PI) / 180; // 60 degrees in radians
-    this.radius = 0.2; // collision radius
+    this.fov = (60 * Math.PI) / 180;
+    this.radius = 0.15;
+
+    /** Vertical look offset — shifts the horizon line (-1 to 1) */
+    this.pitch = 0;
+    /** Mouse sensitivity */
+    this.mouseSensitivity = 0.003;
+    this.pitchSensitivity = 0.002;
+    this._pointerLocked = false;
+    /** Set to true when game is in 'playing' state */
+    this.enableMouseLook = false;
 
     /** @type {Set<string>} currently pressed keys */
     this.keys = new Set();
@@ -53,6 +72,30 @@ class PlayerController {
     doc.addEventListener('keyup', (e) => {
       this.keys.delete(e.code);
     }, opts);
+
+    // Mouse look — click canvas to lock pointer, move to rotate/pitch
+    const canvas = doc.querySelector('#game-canvas');
+    if (canvas) {
+      canvas.addEventListener('mousedown', (e) => {
+        if (this.enableMouseLook && !this._pointerLocked) {
+          canvas.requestPointerLock();
+        }
+      }, opts);
+
+      doc.addEventListener('pointerlockchange', () => {
+        this._pointerLocked = doc.pointerLockElement === canvas;
+      }, opts);
+
+      doc.addEventListener('mousemove', (e) => {
+        if (!this._pointerLocked) return;
+        // Horizontal = rotate
+        this.angle += e.movementX * this.mouseSensitivity;
+        this.angle = ((this.angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        // Vertical = pitch (clamped)
+        this.pitch -= e.movementY * this.pitchSensitivity;
+        this.pitch = Math.max(-0.6, Math.min(0.6, this.pitch));
+      }, opts);
+    }
   }
 
   /**
@@ -64,35 +107,54 @@ class PlayerController {
     this.#handleMovement(dt);
   }
 
-  /** Rotate the player based on left/right keys. */
+  /** Rotate the player based on left/right keys (only when Shift is NOT held). */
   #handleRotation(dt) {
+    const shift = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+    if (shift) return; // Shift + arrows = strafe, not rotate
+
     if (this.keys.has('ArrowLeft') || this.keys.has('KeyA')) {
       this.angle -= this.turnSpeed * dt;
     }
     if (this.keys.has('ArrowRight') || this.keys.has('KeyD')) {
       this.angle += this.turnSpeed * dt;
     }
-    // Normalize angle to [0, 2π)
     this.angle = ((this.angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   }
 
-  /** Move the player forward/backward with collision detection and wall sliding. */
+  /** Move the player with collision detection, strafe (Shift), and slow walk (Ctrl). */
   #handleMovement(dt) {
+    const shift = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+    const ctrl = this.keys.has('ControlLeft') || this.keys.has('ControlRight');
+    const speed = this.moveSpeed * (ctrl ? 0.4 : 1.0);
+
     let dx = 0;
     let dy = 0;
 
+    // Forward/backward
     if (this.keys.has('ArrowUp') || this.keys.has('KeyW')) {
-      dx += Math.cos(this.angle) * this.moveSpeed * dt;
-      dy += Math.sin(this.angle) * this.moveSpeed * dt;
+      dx += Math.cos(this.angle) * speed * dt;
+      dy += Math.sin(this.angle) * speed * dt;
     }
     if (this.keys.has('ArrowDown') || this.keys.has('KeyS')) {
-      dx -= Math.cos(this.angle) * this.moveSpeed * dt;
-      dy -= Math.sin(this.angle) * this.moveSpeed * dt;
+      dx -= Math.cos(this.angle) * speed * dt;
+      dy -= Math.sin(this.angle) * speed * dt;
+    }
+
+    // Strafe left/right (Shift + arrows or Q/E)
+    if (shift && (this.keys.has('ArrowLeft') || this.keys.has('KeyA'))) {
+      const strafeAngle = this.angle - Math.PI / 2;
+      dx += Math.cos(strafeAngle) * speed * dt;
+      dy += Math.sin(strafeAngle) * speed * dt;
+    }
+    if (shift && (this.keys.has('ArrowRight') || this.keys.has('KeyD'))) {
+      const strafeAngle = this.angle + Math.PI / 2;
+      dx += Math.cos(strafeAngle) * speed * dt;
+      dy += Math.sin(strafeAngle) * speed * dt;
     }
 
     if (dx === 0 && dy === 0) return;
 
-    // Wall sliding: try full move, then individual axes [CLEAN-CODE]
+    // Wall sliding: try full move, then individual axes
     const newX = this.x + dx;
     const newY = this.y + dy;
 
@@ -100,11 +162,10 @@ class PlayerController {
       this.x = newX;
       this.y = newY;
     } else if (!this.#collides(newX, this.y)) {
-      this.x = newX; // slide along X axis
+      this.x = newX;
     } else if (!this.#collides(this.x, newY)) {
-      this.y = newY; // slide along Y axis
+      this.y = newY;
     }
-    // else: cornered, no movement
   }
 
   /**
@@ -126,37 +187,31 @@ class PlayerController {
 
   /**
    * Check if a world position is inside a wall.
-   *
-   * Walls exist on cell boundaries. A position is "in a wall" if it's trying
-   * to cross a cell edge where a wall exists.
-   *
-   * For raycaster compatibility, we use the grid cell walls directly.
    */
   #isWall(wx, wy) {
     const col = Math.floor(wx);
     const row = Math.floor(wy);
 
-    // Out of bounds = wall
-    if (row < 0 || row >= this.grid.length || col < 0 || col >= this.grid[0].length) {
-      return true;
+    if (this._legacyGrid) {
+      // Legacy cell-wall mode (for tests using old grid format)
+      const grid = this.tileMap;
+      if (row < 0 || row >= grid.length || col < 0 || col >= grid[0].length) return true;
+      const cell = grid[row][col];
+      const cellX = wx - col;
+      const cellY = wy - row;
+      const t = 0.15;
+      if (cellY < t && cell.north) return true;
+      if (cellY > (1 - t) && cell.south) return true;
+      if (cellX < t && cell.west) return true;
+      if (cellX > (1 - t) && cell.east) return true;
+      return false;
     }
 
-    const cell = this.grid[row][col];
-
-    // Check if the point is near a wall edge within this cell
-    const cellX = wx - col; // 0..1 within cell
-    const cellY = wy - row;
-
-    // Near north wall
-    if (cellY < 0.01 && cell.north) return true;
-    // Near south wall
-    if (cellY > 0.99 && cell.south) return true;
-    // Near west wall
-    if (cellX < 0.01 && cell.west) return true;
-    // Near east wall
-    if (cellX > 0.99 && cell.east) return true;
-
-    return false;
+    // Tile map mode: wall = tileMap[row][col] === 1
+    if (row < 0 || row >= this.tileMap.length || col < 0 || col >= this.tileMap[0].length) {
+      return true;
+    }
+    return this.tileMap[row][col] === 1;
   }
 
   /**

@@ -14,19 +14,23 @@ import { RaycastRenderer } from './renderer.js';
 import { PlayerController } from './player.js';
 import { GameStateManager } from './game-state.js';
 import { HUD } from './hud.js';
+import { HintSystem } from './hint.js';
 import {
   drawStartScreen,
   drawLevelCompleteScreen,
   drawPauseScreen,
   drawLevelSelectScreen,
   drawVictoryScreen,
+  getButtonAtPoint,
+  getHoveredButton,
 } from './screens.js';
 
 /** Game configuration constants */
 const CONFIG = {
-  canvasMaxWidth: 1200,
+  canvasMaxWidth: Infinity,
   aspectRatio: 16 / 9,
   resizeDebounceMs: 150,
+  hintDebounceMs: 500,
 };
 
 class Game {
@@ -36,6 +40,8 @@ class Game {
 
     /** @type {Cell[][] | null} */
     this.grid = null;
+    /** @type {number[][] | null} */
+    this.tileMap = null;
     /** @type {PlayerController | null} */
     this.player = null;
     /** @type {RaycastRenderer | null} */
@@ -65,6 +71,21 @@ class Game {
     this._levelSelectSelection = 1;
     this._levelSelectScroll = 0;
 
+    // Hint system [AC10]
+    this.hintSystem = new HintSystem();
+    /** @type {number} Last H key press timestamp for debounce */
+    this._lastHintTime = 0;
+
+    // FPS counter state
+    this._showFps = false;
+    this._fpsFrames = 0;
+    this._fpsLastTime = 0;
+    this._fpsDisplay = 0;
+
+    // Visited cells for fog of war [AC20]
+    /** @type {Set<string>} Cells the player has visited ("row,col") */
+    this._visitedCells = new Set();
+
     // Game state manager — owns level config, scoring, save/load
     this.gsm = new GameStateManager({ storage: localStorage });
     this.gsm.load();
@@ -76,12 +97,20 @@ class Game {
     this.#bindEvents();
   }
 
-  /** Size canvas to fill viewport width (max 1200px) at 16:9 */
+  /** Size canvas to fill viewport width (max 1200px) at 16:9. [AC: Responsive Resize] */
   #setupCanvas() {
-    const width = Math.min(CONFIG.canvasMaxWidth, window.innerWidth - 20);
-    const height = Math.floor(width / CONFIG.aspectRatio);
+    const maxW = window.innerWidth;
+    const maxH = window.innerHeight - 10;
+    let width = maxW;
+    let height = Math.floor(width / CONFIG.aspectRatio);
+    if (height > maxH) {
+      height = maxH;
+      width = Math.floor(height * CONFIG.aspectRatio);
+    }
     this.canvas.width = width;
     this.canvas.height = height;
+    this.canvas.style.width = `${width}px`;
+    this.canvas.style.height = `${height}px`;
   }
 
   /** Bind keyboard, visibility, and resize events. */
@@ -96,6 +125,36 @@ class Game {
     // Global keyboard handler for menus and state transitions
     document.addEventListener('keydown', (e) => {
       this.#handleKeyDown(e);
+    });
+
+    // Mouse click on menu buttons
+    this.canvas.addEventListener('click', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const scaleX = this.canvas.width / rect.width;
+      const scaleY = this.canvas.height / rect.height;
+      const cx = (e.clientX - rect.left) * scaleX;
+      const cy = (e.clientY - rect.top) * scaleY;
+      this.#handleClick(cx, cy);
+    });
+
+    // Mouse hover — update selectedIndex for button highlighting
+    this.canvas.addEventListener('mousemove', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const scaleX = this.canvas.width / rect.width;
+      const scaleY = this.canvas.height / rect.height;
+      const cx = (e.clientX - rect.left) * scaleX;
+      const cy = (e.clientY - rect.top) * scaleY;
+      const hovered = getHoveredButton(cx, cy);
+      if (hovered >= 0) {
+        const state = this.gsm.gameState;
+        if (state === 'menu') this._menuSelection = hovered;
+        else if (state === 'paused') this._pauseSelection = hovered;
+        else if (state === 'victory') this._victorySelection = hovered;
+        else if (state === 'levelComplete') this._levelCompleteSelection = hovered;
+        this.canvas.style.cursor = 'pointer';
+      } else {
+        this.canvas.style.cursor = 'default';
+      }
     });
 
     // Handle window resize — debounced [Fix 7]
@@ -137,6 +196,24 @@ class Game {
       case 'levelSelect':
         this.#handleLevelSelectKey(e);
         break;
+    }
+  }
+
+  /** Handle mouse clicks on menu buttons */
+  #handleClick(cx, cy) {
+    const btnIdx = getButtonAtPoint(cx, cy);
+    if (btnIdx < 0) return;
+
+    const state = this.gsm.gameState;
+
+    if (state === 'menu') {
+      this.#activateMenuOption(btnIdx);
+    } else if (state === 'paused') {
+      this.#activatePauseOption(btnIdx);
+    } else if (state === 'victory') {
+      this.#activateVictoryOption(btnIdx);
+    } else if (state === 'levelComplete') {
+      this.#activateLevelCompleteOption();
     }
   }
 
@@ -188,13 +265,51 @@ class Game {
     if (e.code === 'Escape' || e.code === 'KeyP') {
       this.gsm.pause();
       this._pauseSelection = 0;
+      if (document.pointerLockElement) document.exitPointerLock();
       e.preventDefault();
     } else if (e.code === 'KeyH') {
-      this.gsm.useHint();
-      // Hint visual feedback would go here (future: path highlight)
+      this.#activateHint();
     } else if (e.code === 'KeyM') {
       this.gsm.updateSettings({ showMinimap: !this.gsm.settings.showMinimap });
+    } else if (e.code === 'KeyF') {
+      this._showFps = !this._showFps;
+    } else if (e.code === 'KeyT') {
+      this.renderer.toggleDayNight();
+      this._pausedImageData = null;
+      this._levelCompleteImageData = null;
     }
+  }
+
+  /**
+   * Activate hint with debounce and hint counter management. [AC10] [AC12]
+   * Debounce: 500ms between activations to prevent spam.
+   */
+  #activateHint() {
+    const now = performance.now();
+
+    // Debounce H key [Edge case: hint spam]
+    if (now - this._lastHintTime < CONFIG.hintDebounceMs) {
+      return;
+    }
+
+    // If hint is already active, ignore (carpet stays until level end)
+    if (this.hintSystem.isActive) {
+      return;
+    }
+
+    // Check if player can use a hint [AC12]
+    if (!this.gsm.useHint()) {
+      // Show "No hints remaining" feedback
+      this._noHintsMessage = now;
+      return;
+    }
+
+    this._lastHintTime = now;
+
+    // Compute path and activate carpet [AC10]
+    const playerRow = Math.floor(this.player.y);
+    const playerCol = Math.floor(this.player.x);
+    this.hintSystem.activate(this.grid, this._tileToCell(playerRow), this._tileToCell(playerCol), this.cellExitRow, this.cellExitCol);
   }
 
   // ── Pause Key Handling [AC19] ─────────────────────────────
@@ -238,11 +353,15 @@ class Game {
 
   #handleLevelCompleteKey(e) {
     if (e.code === 'Enter' || e.code === 'Space') {
-      this.gsm.nextLevel(performance.now());
-      this._levelCompleteImageData = null;
-      this.#buildLevel();
+      this.#activateLevelCompleteOption();
       e.preventDefault();
     }
+  }
+
+  #activateLevelCompleteOption() {
+    this.gsm.nextLevel(performance.now());
+    this._levelCompleteImageData = null;
+    this.#buildLevel();
   }
 
   // ── Victory Key Handling [AC16] ───────────────────────────
@@ -255,16 +374,18 @@ class Game {
       this._victorySelection = (this._victorySelection + 1) % 2;
       e.preventDefault();
     } else if (e.code === 'Enter' || e.code === 'Space') {
-      if (this._victorySelection === 0) {
-        this.gsm.newGame(performance.now());
-        this.#buildLevel();
-      } else {
-        this.gsm.goToLevelSelect();
-        this._levelSelectSelection = 1;
-        this._levelSelectScroll = 0;
-      }
+      this.#activateVictoryOption(this._victorySelection);
       e.preventDefault();
     } else if (e.code === 'KeyL') {
+      this.#activateVictoryOption(1);
+    }
+  }
+
+  #activateVictoryOption(index) {
+    if (index === 0) {
+      this.gsm.newGame(performance.now());
+      this.#buildLevel();
+    } else {
       this.gsm.goToLevelSelect();
       this._levelSelectSelection = 1;
       this._levelSelectScroll = 0;
@@ -324,6 +445,13 @@ class Game {
     this._lastResult = null;
     this._levelCompleteImageData = null;
 
+    // Clear hint state on new level [AC13]
+    this.hintSystem.deactivate();
+    this._noHintsMessage = null;
+
+    // Clear visited cells for new level fog of war [AC20]
+    this._visitedCells = new Set();
+
     // Fold level into lower bits to avoid Date.now() truncation [Fix 13]
     const seed = (Date.now() ^ (level * 2654435761)) >>> 0;
     const gen = new MazeGenerator({
@@ -333,8 +461,14 @@ class Game {
     });
     this.grid = gen.generate();
 
-    this.exitRow = config.gridHeight - 1;
-    this.exitCol = config.gridWidth - 1;
+    // Convert to tile map for thick-wall rendering and collision
+    const tileData = MazeGenerator.toTileMap(this.grid);
+    this.tileMap = tileData.map;
+    this.exitRow = tileData.exitRow;
+    this.exitCol = tileData.exitCol;
+    // Keep cell-grid exit for minimap and hint system
+    this.cellExitRow = config.gridHeight - 1;
+    this.cellExitCol = config.gridWidth - 1;
 
     // Abort previous player's input listeners before creating a new player [Fix 1]
     if (this._inputController) {
@@ -342,16 +476,58 @@ class Game {
     }
     this._inputController = new AbortController();
 
-    // Place player at center of entry cell (0,0), facing east
+    // Place player at center of entry tile, facing an open corridor
+    const startX = tileData.startCol + 0.5;
+    const startY = tileData.startRow + 0.5;
+    const startAngle = this.#findOpenDirection(tileData.startRow, tileData.startCol);
+
     this.player = new PlayerController({
-      x: 0.5,
-      y: 0.5,
-      angle: 0,
-      grid: this.grid,
+      x: startX,
+      y: startY,
+      angle: startAngle,
+      tileMap: this.tileMap,
     });
     this.player.bindInput(document, { signal: this._inputController.signal });
 
+    // Mark starting cell as visited [AC20]
+    this._visitedCells.add('0,0');
+
     this.lastTime = performance.now();
+  }
+
+  /** Convert a tile coordinate to the original cell coordinate */
+  _tileToCell(tile) {
+    return (tile - 1) / 2 | 0;
+  }
+
+  /** Create a proxy player object with cell-grid coordinates for minimap/hint */
+  _cellPlayer() {
+    return {
+      x: (this.player.x - 1) / 2,
+      y: (this.player.y - 1) / 2,
+      angle: this.player.angle,
+      fov: this.player.fov,
+    };
+  }
+
+  /** Find the first open direction from a tile position. Returns angle in radians. */
+  #findOpenDirection(tileRow, tileCol) {
+    const map = this.tileMap;
+    // Check east (0), south (π/2), west (π), north (3π/2)
+    const dirs = [
+      { dr: 0, dc: 1, angle: 0 },          // east
+      { dr: 1, dc: 0, angle: Math.PI / 2 }, // south
+      { dr: 0, dc: -1, angle: Math.PI },     // west
+      { dr: -1, dc: 0, angle: -Math.PI / 2 }, // north
+    ];
+    for (const d of dirs) {
+      const r = tileRow + d.dr;
+      const c = tileCol + d.dc;
+      if (r >= 0 && r < map.length && c >= 0 && c < map[0].length && map[r][c] === 0) {
+        return d.angle;
+      }
+    }
+    return 0; // fallback
   }
 
   // ── Main Game Loop ────────────────────────────────────────
@@ -368,10 +544,12 @@ class Game {
         break;
 
       case 'playing':
+        if (this.player) this.player.enableMouseLook = true;
         this.#updatePlaying(timestamp);
         break;
 
       case 'paused':
+        if (this.player) this.player.enableMouseLook = false;
         this.#renderPaused();
         break;
 
@@ -409,14 +587,31 @@ class Game {
     // Update player position
     this.player.update(dt);
 
-    // Render the 3D view
-    this.renderer.render(this.player, this.grid, this.exitRow, this.exitCol);
+    // Track visited cells for fog of war [AC20] — convert tile to cell coords
+    const playerRow = Math.floor(this.player.y);
+    const playerCol = Math.floor(this.player.x);
+    const cellRow = this._tileToCell(playerRow);
+    const cellCol = this._tileToCell(playerCol);
+    this._visitedCells.add(`${cellRow},${cellCol}`);
+
+    // Update hint path if player moved to new cell [AC11]
+    if (this.hintSystem.isActive) {
+      this.hintSystem.updateIfCellChanged(this.grid, cellRow, cellCol, this.cellExitRow, this.cellExitCol);
+    }
+
+    // Render the 3D view (with hint carpet if active)
+    this.renderer.render(this.player, this.tileMap, this.exitRow, this.exitCol, {
+      hintSystem: this.hintSystem,
+    });
 
     // Draw HUD elements [AC17]
     this.renderer.drawCompass(this.player.angle);
 
     if (this.gsm.settings.showMinimap) {
-      this.renderer.drawMinimap(this.grid, this.player, this.exitRow, this.exitCol);
+      this.renderer.drawMinimap(this.grid, this._cellPlayer(), this.cellExitRow, this.cellExitCol, {
+        visitedCells: this._visitedCells,
+        hintSystem: this.hintSystem,
+      });
     }
 
     // Draw HUD overlay (level, timer, hints) — using cached instance [Fix 3]
@@ -427,10 +622,39 @@ class Game {
       hintsDisplay: this.gsm.getHintsDisplay(),
     });
 
+    // "No hints remaining" message overlay [AC12]
+    if (this._noHintsMessage && timestamp - this._noHintsMessage < 2000) {
+      this.renderer.drawSubtitle('No hints remaining', '#ff6666', 18);
+    } else {
+      this._noHintsMessage = null;
+    }
+
+    // FPS counter [AC: FPS Counter]
+    if (this._showFps) {
+      this.#updateFps(timestamp);
+      this.renderer.drawFpsCounter(this._fpsDisplay);
+    }
+
     // Check win condition
     if (this.player.isAtExit(this.exitRow, this.exitCol)) {
+      this.hintSystem.deactivate();
       this._lastResult = this.gsm.completeLevel(performance.now());
       this.gsm.save();
+      if (document.pointerLockElement) document.exitPointerLock();
+    }
+  }
+
+  /**
+   * Update FPS calculation. Averaged over rolling window for stability.
+   * @param {number} timestamp — current frame timestamp
+   */
+  #updateFps(timestamp) {
+    this._fpsFrames++;
+    const delta = timestamp - this._fpsLastTime;
+    if (delta >= 1000) {
+      this._fpsDisplay = Math.round((this._fpsFrames * 1000) / delta);
+      this._fpsFrames = 0;
+      this._fpsLastTime = timestamp;
     }
   }
 
@@ -440,9 +664,11 @@ class Game {
    */
   #renderPaused() {
     const ctx = this.renderer.ctx;
-    if (!this._pausedImageData && this.grid && this.player) {
+    if (!this._pausedImageData && this.tileMap && this.player) {
       // First paused frame: render once and capture
-      this.renderer.render(this.player, this.grid, this.exitRow, this.exitCol);
+      this.renderer.render(this.player, this.tileMap, this.exitRow, this.exitCol, {
+        hintSystem: this.hintSystem,
+      });
       this._pausedImageData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
     } else if (this._pausedImageData) {
       // Subsequent frames: restore cached image
@@ -459,9 +685,11 @@ class Game {
    */
   #renderLevelComplete() {
     const ctx = this.renderer.ctx;
-    if (!this._levelCompleteImageData && this.grid && this.player) {
+    if (!this._levelCompleteImageData && this.tileMap && this.player) {
       // First level-complete frame: render once and capture
-      this.renderer.render(this.player, this.grid, this.exitRow, this.exitCol);
+      this.renderer.render(this.player, this.tileMap, this.exitRow, this.exitCol, {
+        hintSystem: this.hintSystem,
+      });
       this._levelCompleteImageData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
     } else if (this._levelCompleteImageData) {
       // Subsequent frames: restore cached image

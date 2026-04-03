@@ -83,6 +83,70 @@ class MazeGenerator {
     return grid;
   }
 
+  /**
+   * Convert a cell-wall maze into a tile map where walls occupy actual cells.
+   * Each maze cell becomes a 2×2 block: passage + right wall + bottom wall + corner.
+   * Result is a 2D number array: 0 = open, 1 = wall.
+   * Player coordinates must be scaled: tileX = cellCol * 2 + 1, tileY = cellRow * 2 + 1.
+   * @param {Cell[][]} grid
+   * @returns {{ map: number[][], tileWidth: number, tileHeight: number, startRow: number, startCol: number, exitRow: number, exitCol: number }}
+   */
+  static toTileMap(grid) {
+    const rows = grid.length;
+    const cols = grid[0].length;
+    const tileH = rows * 2 + 1;
+    const tileW = cols * 2 + 1;
+    const map = [];
+
+    // Fill everything as wall first
+    for (let r = 0; r < tileH; r++) {
+      map[r] = new Array(tileW).fill(1);
+    }
+
+    // Carve passages from the cell grid
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const tr = r * 2 + 1;
+        const tc = c * 2 + 1;
+        map[tr][tc] = 0; // cell itself is open
+
+        // Open passage to the south neighbor
+        if (!grid[r][c].south && r < rows - 1) {
+          map[tr + 1][tc] = 0;
+        }
+        // Open passage to the east neighbor
+        if (!grid[r][c].east && c < cols - 1) {
+          map[tr][tc + 1] = 0;
+        }
+        // Open passage to the north (for entry)
+        if (!grid[r][c].north && r === 0) {
+          map[tr - 1][tc] = 0;
+        }
+        // Open passage to the west (for entry)
+        if (!grid[r][c].west && c === 0) {
+          map[tr][tc - 1] = 0;
+        }
+      }
+    }
+
+    // Open exit at south boundary
+    const lastRow = rows - 1;
+    const lastCol = cols - 1;
+    if (!grid[lastRow][lastCol].south) {
+      map[lastRow * 2 + 2][lastCol * 2 + 1] = 0;
+    }
+
+    return {
+      map,
+      tileWidth: tileW,
+      tileHeight: tileH,
+      startRow: 1,
+      startCol: 1,
+      exitRow: lastRow * 2 + 1,
+      exitCol: lastCol * 2 + 1,
+    };
+  }
+
   /** Create an empty grid of cells with all walls intact. */
   #createGrid() {
     const grid = [];

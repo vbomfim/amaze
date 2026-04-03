@@ -44,7 +44,7 @@ const grid = gen.generate();
 console.log('\n🧪 PlayerController — Movement');
 
 {
-  const player = new PlayerController({ x: 0.5, y: 0.5, angle: 0, grid });
+  const player = new PlayerController({ x: 0.5, y: 0.5, angle: 0, grid, tileMap: grid });
 
   // Forward movement (angle=0 → east → +X)
   player.keys.add('KeyW');
@@ -55,7 +55,7 @@ console.log('\n🧪 PlayerController — Movement');
 
 {
   // Use a wall-free scenario: ArrowUp at center of maze with long run
-  const player = new PlayerController({ x: 0.5, y: 0.5, angle: 0, grid });
+  const player = new PlayerController({ x: 0.5, y: 0.5, angle: 0, grid, tileMap: grid });
   const startX = player.x;
   player.keys.add('ArrowUp');
   player.update(1.0);
@@ -68,7 +68,7 @@ console.log('\n🧪 PlayerController — Movement');
 console.log('\n🧪 PlayerController — Rotation');
 
 {
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
 
   player.keys.add('ArrowLeft');
   player.update(1.0); // turn left for 1 second at 2.5 rad/s
@@ -82,7 +82,7 @@ console.log('\n🧪 PlayerController — Rotation');
 }
 
 {
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
 
   player.keys.add('KeyD');
   player.update(1.0);
@@ -95,7 +95,7 @@ console.log('\n🧪 PlayerController — Rotation');
 console.log('\n🧪 PlayerController — Multi-key support');
 
 {
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
   const startAngle = player.angle;
   const startX = player.x;
 
@@ -115,12 +115,12 @@ console.log('\n🧪 PlayerController — Delta-time independence');
 
 {
   // One big step vs many small steps should produce similar results
-  const player1 = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player1 = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
   player1.keys.add('KeyD');
   player1.update(1.0);
   const angle1 = player1.angle;
 
-  const player2 = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player2 = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
   player2.keys.add('KeyD');
   for (let i = 0; i < 100; i++) {
     player2.update(0.01);
@@ -136,7 +136,7 @@ console.log('\n🧪 PlayerController — Collision detection');
 
 {
   // Place player facing north wall — should not pass through
-  const player = new PlayerController({ x: 0.5, y: 0.5, angle: -Math.PI / 2, grid });
+  const player = new PlayerController({ x: 0.5, y: 0.5, angle: -Math.PI / 2, grid, tileMap: grid });
   // angle = -π/2 → facing north (−Y direction)
   player.keys.add('KeyW');
   for (let i = 0; i < 100; i++) {
@@ -149,7 +149,7 @@ console.log('\n🧪 PlayerController — Collision detection');
 
 {
   // Place player facing west wall — should not pass through
-  const player = new PlayerController({ x: 0.5, y: 0.5, angle: Math.PI, grid });
+  const player = new PlayerController({ x: 0.5, y: 0.5, angle: Math.PI, grid, tileMap: grid });
   player.keys.add('KeyW');
   for (let i = 0; i < 100; i++) {
     player.update(0.016);
@@ -164,7 +164,7 @@ console.log('\n🧪 PlayerController — Wall sliding');
 
 {
   // Move diagonally into a wall — should slide along one axis
-  const player = new PlayerController({ x: 0.5, y: 0.5, angle: Math.PI * 0.75, grid });
+  const player = new PlayerController({ x: 0.5, y: 0.5, angle: Math.PI * 0.75, grid, tileMap: grid });
   // angle ~135° → northwest-ish
   const startX = player.x;
   const startY = player.y;
@@ -184,12 +184,12 @@ console.log('\n🧪 PlayerController — Wall sliding');
 console.log('\n🧪 PlayerController — Exit detection');
 
 {
-  const player = new PlayerController({ x: 6.5, y: 6.5, angle: 0, grid });
+  const player = new PlayerController({ x: 6.5, y: 6.5, angle: 0, grid, tileMap: grid });
   assert(player.isAtExit(6, 6), 'detects player at exit cell (6,6)');
 }
 
 {
-  const player = new PlayerController({ x: 0.5, y: 0.5, angle: 0, grid });
+  const player = new PlayerController({ x: 0.5, y: 0.5, angle: 0, grid, tileMap: grid });
   assert(!player.isAtExit(6, 6), 'player at (0,0) is not at exit');
 }
 
@@ -198,7 +198,7 @@ console.log('\n🧪 PlayerController — Exit detection');
 console.log('\n🧪 PlayerController — Backward movement');
 
 {
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
   const startX = player.x;
   player.keys.add('KeyS');
   player.update(0.1);

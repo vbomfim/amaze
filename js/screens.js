@@ -2,9 +2,7 @@
  * Screens — Canvas-rendered UI screens for game menus and overlays.
  *
  * All screens are drawn on the canvas with no DOM elements.
- * Dark theme, centered layout, keyboard-navigable.
- *
- * Screens: Start, LevelComplete, Pause, LevelSelect, Victory
+ * Dark theme, centered layout, keyboard and mouse navigable.
  *
  * [CLEAN-CODE] [SOLID] — Single responsibility: screen rendering only
  */
@@ -23,6 +21,32 @@ const SCREEN_COLORS = {
   buttonBorder: '#00cccc',
   buttonHighlight: 'rgba(0, 204, 204, 0.3)',
 };
+
+/** Stores button hit-test rectangles from the last screen render.
+ *  Each entry: { index, x, y, width, height, enabled } */
+let _buttonRects = [];
+
+/** Clear button rects before drawing a new screen */
+function resetButtonRects() {
+  _buttonRects = [];
+}
+
+/** Get the button index at a canvas coordinate, or -1 */
+function getButtonAtPoint(canvasX, canvasY) {
+  for (const btn of _buttonRects) {
+    if (btn.enabled &&
+        canvasX >= btn.x && canvasX <= btn.x + btn.width &&
+        canvasY >= btn.y && canvasY <= btn.y + btn.height) {
+      return btn.index;
+    }
+  }
+  return -1;
+}
+
+/** Get the button index being hovered, or -1 */
+function getHoveredButton(canvasX, canvasY) {
+  return getButtonAtPoint(canvasX, canvasY);
+}
 
 /**
  * Draw a centered text line.
@@ -52,11 +76,16 @@ function drawCenteredText(ctx, text, x, y, color, font) {
  * @param {boolean} selected — if true, draw highlighted
  * @param {boolean} enabled — if false, draw dimmed
  */
-function drawButton(ctx, text, cx, cy, selected, enabled) {
+function drawButton(ctx, text, cx, cy, selected, enabled, btnIndex) {
   const width = 260;
   const height = 36;
   const x = cx - width / 2;
   const y = cy - height / 2;
+
+  // Register for click hit-testing
+  if (btnIndex !== undefined) {
+    _buttonRects.push({ index: btnIndex, x, y, width, height, enabled });
+  }
 
   ctx.save();
   ctx.fillStyle = selected ? SCREEN_COLORS.buttonHighlight : SCREEN_COLORS.buttonBg;
@@ -84,6 +113,7 @@ function drawButton(ctx, text, cx, cy, selected, enabled) {
  * @param {{ highScore: number, canContinue: boolean, canLevelSelect: boolean, selectedIndex: number }} data
  */
 function drawStartScreen(ctx, w, h, data) {
+  resetButtonRects();
   const cx = w / 2;
 
   // Background
@@ -101,14 +131,14 @@ function drawStartScreen(ctx, w, h, data) {
   const buttonSpacing = 50;
   let btnIdx = 0;
 
-  drawButton(ctx, 'New Game (N / Enter)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true);
+  drawButton(ctx, 'New Game (N / Enter)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true, btnIdx);
   btnIdx++;
 
-  drawButton(ctx, 'Continue (C)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, data.canContinue);
+  drawButton(ctx, 'Continue (C)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, data.canContinue, btnIdx);
   btnIdx++;
 
   if (data.canLevelSelect) {
-    drawButton(ctx, 'Level Select (L)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true);
+    drawButton(ctx, 'Level Select (L)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true, btnIdx);
     btnIdx++;
   }
 
@@ -138,6 +168,7 @@ function drawStartScreen(ctx, w, h, data) {
  * @param {{ level, time, hintsUsed, score, totalScore, breakdown }} result
  */
 function drawLevelCompleteScreen(ctx, w, h, result) {
+  resetButtonRects();
   const cx = w / 2;
 
   // Semi-transparent overlay
@@ -176,7 +207,7 @@ function drawLevelCompleteScreen(ctx, w, h, result) {
   drawCenteredText(ctx, `Total Score: ${result.totalScore.toLocaleString()}`, cx, breakdownY + lineH * 4.5, SCREEN_COLORS.primary, '18px monospace');
 
   // Continue prompt
-  drawCenteredText(ctx, 'Press Enter or Space for Next Level →', cx, h * 0.88, SCREEN_COLORS.primaryDim, '15px monospace');
+    drawButton(ctx, 'Next Level → (Enter)', cx, h * 0.88, true, true, 0);
 }
 
 // ── Pause Menu [AC19] ───────────────────────────────────────
@@ -189,6 +220,7 @@ function drawLevelCompleteScreen(ctx, w, h, result) {
  * @param {{ selectedIndex: number }} data
  */
 function drawPauseScreen(ctx, w, h, data) {
+  resetButtonRects();
   const cx = w / 2;
 
   // Semi-transparent overlay
@@ -201,9 +233,9 @@ function drawPauseScreen(ctx, w, h, data) {
   // Buttons
   const btnY = h * 0.48;
   const spacing = 50;
-  drawButton(ctx, 'Resume (ESC / P / Enter)', cx, btnY, data.selectedIndex === 0, true);
-  drawButton(ctx, 'Restart Level (R)', cx, btnY + spacing, data.selectedIndex === 1, true);
-  drawButton(ctx, 'Quit to Menu (Q)', cx, btnY + spacing * 2, data.selectedIndex === 2, true);
+  drawButton(ctx, 'Resume (ESC / P / Enter)', cx, btnY, data.selectedIndex === 0, true, 0);
+  drawButton(ctx, 'Restart Level (R)', cx, btnY + spacing, data.selectedIndex === 1, true, 1);
+  drawButton(ctx, 'Quit to Menu (Q)', cx, btnY + spacing * 2, data.selectedIndex === 2, true, 2);
 }
 
 // ── Level Select Screen ─────────────────────────────────────
@@ -296,6 +328,7 @@ function drawLevelSelectScreen(ctx, w, h, data) {
  * @param {{ totalScore: number, highScore: number, selectedIndex: number }} data
  */
 function drawVictoryScreen(ctx, w, h, data) {
+  resetButtonRects();
   const cx = w / 2;
 
   // Background
@@ -313,8 +346,8 @@ function drawVictoryScreen(ctx, w, h, data) {
   // Buttons
   const btnY = h * 0.65;
   const spacing = 50;
-  drawButton(ctx, 'Play Again (Enter)', cx, btnY, data.selectedIndex === 0, true);
-  drawButton(ctx, 'Level Select (L)', cx, btnY + spacing, data.selectedIndex === 1, true);
+  drawButton(ctx, 'Play Again (Enter)', cx, btnY, data.selectedIndex === 0, true, 0);
+  drawButton(ctx, 'Level Select (L)', cx, btnY + spacing, data.selectedIndex === 1, true, 1);
 }
 
 export {
@@ -323,5 +356,8 @@ export {
   drawPauseScreen,
   drawLevelSelectScreen,
   drawVictoryScreen,
+  getButtonAtPoint,
+  getHoveredButton,
+  resetButtonRects,
   SCREEN_COLORS,
 };

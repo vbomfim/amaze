@@ -218,7 +218,7 @@ console.log('\n🧪 mulberry32 — PRNG properties [EDGE]');
 console.log('\n🧪 PlayerController — Zero delta-time [EDGE]');
 
 {
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
   const startX = player.x;
   const startY = player.y;
   const startAngle = player.angle;
@@ -237,7 +237,7 @@ console.log('\n🧪 PlayerController — Very large delta-time [EDGE]');
 
 {
   // Large dt should not teleport player through walls
-  const player = new PlayerController({ x: 0.5, y: 0.5, angle: 0, grid });
+  const player = new PlayerController({ x: 0.5, y: 0.5, angle: 0, grid, tileMap: grid });
   player.keys.add('KeyW');
   player.update(10.0); // 10 seconds in one frame — absurd but possible if tab was suspended
   player.keys.clear();
@@ -253,7 +253,7 @@ console.log('\n🧪 PlayerController — Opposing keys simultaneously [EDGE]');
 
 {
   // W + S simultaneously should cancel (or near-cancel)
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
   const startX = player.x;
   const startY = player.y;
 
@@ -272,7 +272,7 @@ console.log('\n🧪 PlayerController — Opposing keys simultaneously [EDGE]');
 
 {
   // A + D simultaneously should cancel rotation
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 1.0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 1.0, grid, tileMap: grid });
   const startAngle = player.angle;
 
   player.keys.add('KeyA');
@@ -286,7 +286,7 @@ console.log('\n🧪 PlayerController — Opposing keys simultaneously [EDGE]');
 
 {
   // ArrowLeft + ArrowRight simultaneously
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 1.0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 1.0, grid, tileMap: grid });
   const startAngle = player.angle;
 
   player.keys.add('ArrowLeft');
@@ -301,7 +301,7 @@ console.log('\n🧪 PlayerController — Missing key bindings coverage [COVERAGE
 
 {
   // KeyA (left rotation) — not tested in existing player.test.js
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 1.0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 1.0, grid, tileMap: grid });
   const startAngle = player.angle;
 
   player.keys.add('KeyA');
@@ -320,7 +320,7 @@ console.log('\n🧪 PlayerController — Missing key bindings coverage [COVERAGE
 
 {
   // ArrowDown (backward) — not tested in existing player.test.js
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
   const startX = player.x;
 
   player.keys.add('ArrowDown');
@@ -332,7 +332,7 @@ console.log('\n🧪 PlayerController — Missing key bindings coverage [COVERAGE
 
 {
   // ArrowRight (right rotation)
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
 
   player.keys.add('ArrowRight');
   player.update(1.0);
@@ -344,7 +344,7 @@ console.log('\n🧪 PlayerController — Missing key bindings coverage [COVERAGE
 console.log('\n🧪 PlayerController — Angle normalization wraparound [EDGE]');
 
 {
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
 
   // Rotate left a LOT → angle should wrap around and stay in [0, 2π)
   player.keys.add('ArrowLeft');
@@ -361,7 +361,7 @@ console.log('\n🧪 PlayerController — Angle normalization wraparound [EDGE]')
 
 {
   // Rotate right a LOT
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
 
   player.keys.add('ArrowRight');
   for (let i = 0; i < 1000; i++) {
@@ -378,7 +378,7 @@ console.log('\n🧪 PlayerController — Angle normalization wraparound [EDGE]')
 console.log('\n🧪 PlayerController — Rapid key toggling [EDGE]');
 
 {
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
   const startX = player.x;
   const startY = player.y;
 
@@ -444,7 +444,7 @@ console.log('\n🧪 PlayerController — Exit detection sub-positions [EDGE]');
   ];
 
   for (const pos of subPositions) {
-    const player = new PlayerController({ x: pos.x, y: pos.y, angle: 0, grid });
+    const player = new PlayerController({ x: pos.x, y: pos.y, angle: 0, grid, tileMap: grid });
     assert(
       player.isAtExit(6, 6),
       `[EDGE] isAtExit at ${pos.desc} (${pos.x}, ${pos.y})`
@@ -459,7 +459,7 @@ console.log('\n🧪 PlayerController — Exit detection sub-positions [EDGE]');
   ];
 
   for (const pos of notExit) {
-    const player = new PlayerController({ x: pos.x, y: pos.y, angle: 0, grid });
+    const player = new PlayerController({ x: pos.x, y: pos.y, angle: 0, grid, tileMap: grid });
     assert(
       !player.isAtExit(6, 6),
       `[EDGE] NOT at exit from ${pos.desc}`
@@ -470,7 +470,7 @@ console.log('\n🧪 PlayerController — Exit detection sub-positions [EDGE]');
 console.log('\n🧪 PlayerController — Initial state contract [CONTRACT]');
 
 {
-  const player = new PlayerController({ x: 1.5, y: 2.5, angle: 0.7, grid });
+  const player = new PlayerController({ x: 1.5, y: 2.5, angle: 0.7, grid, tileMap: grid });
 
   assert(player.x === 1.5, '[CONTRACT] initial x preserved');
   assert(player.y === 2.5, '[CONTRACT] initial y preserved');
@@ -560,7 +560,7 @@ console.log('\n🧪 Performance — Maze generation time [PERF]');
 console.log('\n🧪 Performance — Player update throughput [PERF]');
 
 {
-  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid });
+  const player = new PlayerController({ x: 3.5, y: 3.5, angle: 0, grid, tileMap: grid });
   player.keys.add('KeyW');
   player.keys.add('KeyD');
 

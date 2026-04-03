@@ -1,6 +1,7 @@
 {
   "name": "dev-guardian-1775187518",
   "version": "1.0.0",
+  "type": "module",
   "description": "A first-person 3D maze browser game. You are the mouse — navigate through raycasted wireframe mazes, find the cheese, and escape!",
   "main": "eslint.config.js",
   "directories": {
