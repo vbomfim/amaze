@@ -123,7 +123,7 @@ class GameStateManager {
     this._accumulatedPauseMs = 0;
 
     // Settings
-    this.settings = { showMinimap: true };
+    this.settings = { showMinimap: true, muted: false };
 
     // Level select data cache [Fix 5]
     /** @type {Array<{ level: number, bestScore: number, unlocked: boolean }> | null} */
@@ -496,6 +496,9 @@ class GameStateManager {
           showMinimap: typeof data.settings.showMinimap === 'boolean'
             ? data.settings.showMinimap
             : true,
+          muted: typeof data.settings.muted === 'boolean'
+            ? data.settings.muted
+            : false,
         };
       }
 
@@ -517,7 +520,7 @@ class GameStateManager {
     this.levelStartTime = 0;
     this._pausedAt = 0;
     this._accumulatedPauseMs = 0;
-    this.settings = { showMinimap: true };
+    this.settings = { showMinimap: true, muted: false };
     this._levelSelectCache = null;
   }
 

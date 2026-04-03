@@ -78,6 +78,9 @@ class RaycastRenderer {
     this.height = canvas.height;
 
     this._hitResult = { distance: 0, side: 0, mapRow: 0, mapCol: 0 };
+
+    /** Depth buffer for sprite occlusion — perpendicular wall distance per column */
+    this.depthBuffer = new Float32Array(this.width);
     this._colorKeyCache = new Map(
       Object.entries(COLORS).map(([key, hex]) => [hex, key])
     );
@@ -278,6 +281,9 @@ class RaycastRenderer {
     const hintSystem = options && options.hintSystem;
     const pitchOffset = (player.pitch || 0) * this.height;
 
+    // Reset depth buffer for sprite occlusion testing
+    this.depthBuffer.fill(Infinity);
+
     for (let col = 0; col < numRays; col++) {
       const rayFraction = (col / numRays) * 2 - 1;
       const rayAngle = player.angle + rayFraction * halfFov;
@@ -286,6 +292,7 @@ class RaycastRenderer {
 
       if (hit) {
         const perpDist = hit.distance * Math.cos(rayAngle - player.angle);
+        this.depthBuffer[col] = perpDist;
         const sliceHeight = Math.min(this.height * 2, this.height / perpDist);
         const sliceTop = (this.height - sliceHeight) / 2 + pitchOffset;
 

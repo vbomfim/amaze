@@ -23,7 +23,11 @@ export default [
         Array: "readonly",
         JSON: "readonly",
         Math: "readonly",
-        String: "readonly"
+        String: "readonly",
+        AudioContext: "readonly",
+        Float32Array: "readonly",
+        Infinity: "readonly",
+        Promise: "readonly"
       }
     },
     rules: {
@@ -46,7 +50,12 @@ export default [
       globals: {
         console: "readonly",
         process: "readonly",
-        performance: "readonly"
+        performance: "readonly",
+        Float32Array: "readonly",
+        Map: "readonly",
+        Set: "readonly",
+        Math: "readonly",
+        Promise: "readonly"
       }
     },
     rules: {

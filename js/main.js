@@ -15,6 +15,7 @@ import { PlayerController } from './player.js';
 import { GameStateManager } from './game-state.js';
 import { HUD } from './hud.js';
 import { HintSystem } from './hint.js';
+import { AudioManager } from './audio.js';
 import {
   drawStartScreen,
   drawLevelCompleteScreen,
@@ -76,6 +77,16 @@ class Game {
     /** @type {number} Last H key press timestamp for debounce */
     this._lastHintTime = 0;
 
+    // Audio system — lazy init on first user interaction [Issue #4]
+    this.audioManager = new AudioManager({
+      muted: false,
+    });
+    /** Whether audioManager.init() has been called */
+    this._audioInitialized = false;
+    /** Last player position for footstep distance tracking */
+    this._lastFootstepX = 0;
+    this._lastFootstepY = 0;
+
     // FPS counter state
     this._showFps = false;
     this._fpsFrames = 0;
@@ -124,11 +135,13 @@ class Game {
 
     // Global keyboard handler for menus and state transitions
     document.addEventListener('keydown', (e) => {
+      this.#initAudioOnce();
       this.#handleKeyDown(e);
     });
 
     // Mouse click on menu buttons
     this.canvas.addEventListener('click', (e) => {
+      this.#initAudioOnce();
       const rect = this.canvas.getBoundingClientRect();
       const scaleX = this.canvas.width / rect.width;
       const scaleY = this.canvas.height / rect.height;
@@ -168,6 +181,20 @@ class Game {
         this._levelCompleteImageData = null;
       }, CONFIG.resizeDebounceMs);
     });
+  }
+
+  /**
+   * Initialize AudioManager on first user interaction (click/keypress).
+   * Satisfies browser autoplay policy. Idempotent. [Issue #4]
+   */
+  #initAudioOnce() {
+    if (this._audioInitialized) return;
+    this._audioInitialized = true;
+    this.audioManager.init();
+    // Restore muted state from settings
+    if (this.gsm.settings.muted === true) {
+      this.audioManager.muted = true;
+    }
   }
 
   /**
@@ -271,6 +298,10 @@ class Game {
       this.#activateHint();
     } else if (e.code === 'KeyM') {
       this.gsm.updateSettings({ showMinimap: !this.gsm.settings.showMinimap });
+    } else if (e.code === 'KeyN') {
+      // Toggle mute [Issue #4]
+      const muted = this.audioManager.toggleMute();
+      this.gsm.updateSettings({ muted });
     } else if (e.code === 'KeyF') {
       this._showFps = !this._showFps;
     } else if (e.code === 'KeyT') {
@@ -305,6 +336,9 @@ class Game {
     }
 
     this._lastHintTime = now;
+
+    // Play hint activation sound [Issue #4]
+    this.audioManager.playHintActivate();
 
     // Compute path and activate carpet [AC10]
     const playerRow = Math.floor(this.player.y);
@@ -492,6 +526,10 @@ class Game {
     // Mark starting cell as visited [AC20]
     this._visitedCells.add('0,0');
 
+    // Reset footstep tracking for audio [Issue #4]
+    this._lastFootstepX = startX;
+    this._lastFootstepY = startY;
+
     this.lastTime = performance.now();
   }
 
@@ -587,6 +625,16 @@ class Game {
     // Update player position
     this.player.update(dt);
 
+    // Footstep audio — play when player moves >0.1 units since last footstep [Issue #4]
+    const footDx = this.player.x - this._lastFootstepX;
+    const footDy = this.player.y - this._lastFootstepY;
+    const footDist = Math.sqrt(footDx * footDx + footDy * footDy);
+    if (footDist > 0.1) {
+      this.audioManager.playFootstep();
+      this._lastFootstepX = this.player.x;
+      this._lastFootstepY = this.player.y;
+    }
+
     // Track visited cells for fog of war [AC20] — convert tile to cell coords
     const playerRow = Math.floor(this.player.y);
     const playerCol = Math.floor(this.player.x);
@@ -638,6 +686,7 @@ class Game {
     // Check win condition
     if (this.player.isAtExit(this.exitRow, this.exitCol)) {
       this.hintSystem.deactivate();
+      this.audioManager.playLevelComplete();
       this._lastResult = this.gsm.completeLevel(performance.now());
       this.gsm.save();
       if (document.pointerLockElement) document.exitPointerLock();
