@@ -76,7 +76,7 @@ class PlayerController {
     // Mouse look — click canvas to lock pointer, move to rotate/pitch
     const canvas = doc.querySelector('#game-canvas');
     if (canvas) {
-      canvas.addEventListener('mousedown', (e) => {
+      canvas.addEventListener('mousedown', (_e) => {
         if (this.enableMouseLook && !this._pointerLocked) {
           canvas.requestPointerLock();
         }
