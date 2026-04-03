@@ -51,6 +51,10 @@ body {
   user-select: none;
 }
 
+.exit-hint {
+  color: #ffcc00;
+}
+
 .controls-hint kbd {
   display: inline-block;
   padding: 2px 6px;

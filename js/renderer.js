@@ -67,7 +67,6 @@ class RaycastRenderer {
    * @param {number} exitCol
    */
   #castAllRays(player, grid, exitRow, exitCol) {
-    const ctx = this.ctx;
     const numRays = this.width;
     const halfFov = player.fov / 2;
 

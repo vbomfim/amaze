@@ -49,7 +49,7 @@ class MazeGenerator {
     this.#validate(width, height);
     this.width = width;
     this.height = height;
-    this.random = seed != null ? mulberry32(seed) : Math.random;
+    this.random = seed !== null && seed !== undefined ? mulberry32(seed) : Math.random;
   }
 
   /**
