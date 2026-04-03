@@ -33,6 +33,13 @@ jobs:
         run: |
           node tests/maze.test.js
           node tests/player.test.js
+          node tests/game-state.test.js
+          node tests/edge-cases.test.js
+          node tests/integration.test.js
+          node tests/qa-gamestate-maze-integration.test.js
+          node tests/qa-save-load.test.js
+          node tests/qa-score-progression.test.js
+          node tests/qa-state-machine.test.js
 
   deploy:
     needs: test

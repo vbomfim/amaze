@@ -1,0 +1,18 @@
+{
+  "name": "dev-guardian-1775187518",
+  "version": "1.0.0",
+  "description": "A first-person 3D maze browser game. You are the mouse — navigate through raycasted wireframe mazes, find the cheese, and escape!",
+  "main": "eslint.config.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "eslint": "^10.1.0"
+  }
+}

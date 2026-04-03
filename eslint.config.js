@@ -17,11 +17,17 @@ export default [
         setTimeout: "readonly",
         clearTimeout: "readonly",
         Map: "readonly",
-        Set: "readonly"
+        Set: "readonly",
+        Date: "readonly",
+        Number: "readonly",
+        Array: "readonly",
+        JSON: "readonly",
+        Math: "readonly",
+        String: "readonly"
       }
     },
     rules: {
-      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
       "no-undef": "error",
       "no-constant-condition": "error",
       "no-debugger": "error",
@@ -44,7 +50,7 @@ export default [
       }
     },
     rules: {
-      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
       "no-undef": "error"
     }
   }
