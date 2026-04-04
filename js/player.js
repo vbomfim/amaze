@@ -56,6 +56,12 @@ class PlayerController {
 
     /** @type {Set<string>} currently pressed keys */
     this.keys = new Set();
+
+    /** Touch input state — set by setTouchInput(), used in update() */
+    this._touchMoveX = 0;
+    this._touchMoveY = 0;
+    this._touchLookX = 0;
+    this._touchActive = false;
   }
 
   /**
@@ -102,13 +108,91 @@ class PlayerController {
   }
 
   /**
+   * Set touch input values for the next update cycle.
+   * When active, touch input overrides keyboard for movement and rotation.
+   * @param {number} moveX — horizontal movement (-1 to 1, left to right)
+   * @param {number} moveY — vertical movement (-1 to 1, up to down in screen coords, up = forward)
+   * @param {number} lookX — horizontal look (-1 to 1, left to right rotation)
+   */
+  setTouchInput(moveX, moveY, lookX) {
+    this._touchMoveX = moveX;
+    this._touchMoveY = moveY;
+    this._touchLookX = lookX;
+    this._touchActive = (moveX !== 0 || moveY !== 0 || lookX !== 0);
+  }
+
+  /**
+   * Clear touch input — reverts to keyboard-only control.
+   */
+  clearTouchInput() {
+    this._touchMoveX = 0;
+    this._touchMoveY = 0;
+    this._touchLookX = 0;
+    this._touchActive = false;
+  }
+
+  /**
    * Update player position and angle based on pressed keys and elapsed time.
    * @param {number} dt — delta time in seconds
    */
   update(dt) {
     this.collided = false;
-    this.#handleRotation(dt);
-    this.#handleMovement(dt);
+    if (this._touchActive) {
+      this.#handleTouchRotation(dt);
+      this.#handleTouchMovement(dt);
+    } else {
+      this.#handleRotation(dt);
+      this.#handleMovement(dt);
+    }
+  }
+
+  /** Rotate the player based on touch lookX input. */
+  #handleTouchRotation(dt) {
+    if (this._touchLookX === 0) return;
+    this.angle += this._touchLookX * this.turnSpeed * dt;
+    this.angle = ((this.angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  }
+
+  /** Move the player based on touch joystick input. */
+  #handleTouchMovement(dt) {
+    const moveX = this._touchMoveX;
+    const moveY = this._touchMoveY;
+    if (moveX === 0 && moveY === 0) return;
+
+    const speed = this.moveSpeed;
+
+    // moveY = -1 means "forward" (up on screen), +1 means "backward"
+    // moveX = -1 means "strafe left", +1 means "strafe right"
+    let dx = 0;
+    let dy = 0;
+
+    // Forward/backward along facing direction
+    dx += Math.cos(this.angle) * speed * (-moveY) * dt;
+    dy += Math.sin(this.angle) * speed * (-moveY) * dt;
+
+    // Strafe along perpendicular direction
+    const strafeAngle = this.angle + Math.PI / 2;
+    dx += Math.cos(strafeAngle) * speed * moveX * dt;
+    dy += Math.sin(strafeAngle) * speed * moveX * dt;
+
+    if (dx === 0 && dy === 0) return;
+
+    // Wall sliding (same logic as keyboard movement)
+    const newX = this.x + dx;
+    const newY = this.y + dy;
+
+    if (!this.#collides(newX, newY)) {
+      this.x = newX;
+      this.y = newY;
+    } else if (!this.#collides(newX, this.y)) {
+      this.x = newX;
+      this.collided = true;
+    } else if (!this.#collides(this.x, newY)) {
+      this.y = newY;
+      this.collided = true;
+    } else {
+      this.collided = true;
+    }
   }
 
   /** Rotate the player based on left/right keys (only when Shift is NOT held). */

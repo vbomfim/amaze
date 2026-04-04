@@ -30,19 +30,22 @@ const SPRITE_TYPES = {
 /** Minimum distance to render a sprite (avoids division by near-zero) */
 const MIN_SPRITE_DIST = 0.2;
 
-/** Maximum distance to render a sprite (culling far sprites) */
-const MAX_SPRITE_DIST = 24;
+/** Maximum distance to render a sprite (culling far sprites) — configurable for mobile */
+let MAX_SPRITE_DIST = 24;
 
 class SpriteRenderer {
   /**
    * @param {CanvasRenderingContext2D} ctx — canvas 2D context
    * @param {number} width — canvas width in pixels
    * @param {number} height — canvas height in pixels
+   * @param {Object} [options]
+   * @param {number} [options.maxSpriteDist=24] — maximum sprite render distance
    */
-  constructor(ctx, width, height) {
+  constructor(ctx, width, height, options = {}) {
     this.ctx = ctx;
     this.width = width;
     this.height = height;
+    this.maxSpriteDist = options.maxSpriteDist || MAX_SPRITE_DIST;
   }
 
   /**
@@ -74,7 +77,7 @@ class SpriteRenderer {
       const dy = s.y - player.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < MIN_SPRITE_DIST || dist > MAX_SPRITE_DIST) continue;
+      if (dist < MIN_SPRITE_DIST || dist > this.maxSpriteDist) continue;
 
       // Angle to sprite relative to player direction
       const angle = Math.atan2(dy, dx) - player.angle;
@@ -113,7 +116,7 @@ class SpriteRenderer {
 
     // Screen size based on distance (same scale as walls)
     const spriteScreenSize = Math.floor((typeDef.size / dist) * projDist);
-    if (spriteScreenSize < 1) return;
+    if (spriteScreenSize < 2) return; // Skip tiny sprites (mobile perf)
 
     // Screen Y — centered at horizon, offset downward for floor items
     const yOff = typeDef.yOffset || 0;

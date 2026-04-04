@@ -70,12 +70,17 @@ const SKY = {
 class RaycastRenderer {
   /**
    * @param {HTMLCanvasElement} canvas
+   * @param {Object} [options]
+   * @param {number} [options.rayScale=1] — ray resolution scale (2 = half rays, 2px slices)
    */
-  constructor(canvas) {
+  constructor(canvas, options = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.width = canvas.width;
     this.height = canvas.height;
+
+    /** Ray resolution scale: 1 = full, 2 = half rays / 2px wide slices */
+    this.rayScale = options.rayScale || 1;
 
     this._hitResult = { distance: 0, side: 0, mapRow: 0, mapCol: 0 };
 
@@ -276,7 +281,8 @@ class RaycastRenderer {
    * @param {Object} [options]
    */
   #castAllRays(player, tileMap, exitRow, exitCol, options) {
-    const numRays = this.width;
+    const scale = this.rayScale;
+    const numRays = Math.ceil(this.width / scale);
     const halfFov = player.fov / 2;
     const hintSystem = options && options.hintSystem;
     const pitchOffset = (player.pitch || 0) * this.height;
@@ -284,15 +290,19 @@ class RaycastRenderer {
     // Reset depth buffer for sprite occlusion testing
     this.depthBuffer.fill(Infinity);
 
-    for (let col = 0; col < numRays; col++) {
-      const rayFraction = (col / numRays) * 2 - 1;
+    for (let i = 0; i < numRays; i++) {
+      const col = i * scale;
+      const rayFraction = (col / this.width) * 2 - 1;
       const rayAngle = player.angle + rayFraction * halfFov;
 
       const hit = this.#castRay(player.x, player.y, rayAngle, tileMap);
 
       if (hit) {
         const perpDist = hit.distance * Math.cos(rayAngle - player.angle);
-        this.depthBuffer[col] = perpDist;
+        // Fill depth buffer for all columns this slice covers
+        for (let s = 0; s < scale && (col + s) < this.width; s++) {
+          this.depthBuffer[col + s] = perpDist;
+        }
         const sliceHeight = Math.min(this.height * 2, this.height / perpDist);
         const sliceTop = (this.height - sliceHeight) / 2 + pitchOffset;
 
@@ -307,13 +317,13 @@ class RaycastRenderer {
         }
 
         const shade = Math.max(VISUAL.minShade, 1.0 - perpDist / VISUAL.shadeDropoffDistance);
-        this.#drawWallSlice(col, sliceTop, sliceHeight, color, shade, isExit);
+        this.#drawWallSlice(col, sliceTop, sliceHeight, color, shade, isExit, scale);
 
         // Red carpet or exit portal on floor
         if (hintSystem && hintSystem.isActive) {
-          this.#drawCarpetFloorStrip(col, sliceTop, sliceHeight, perpDist, rayAngle, player, hintSystem);
+          this.#drawCarpetFloorStrip(col, sliceTop, sliceHeight, perpDist, rayAngle, player, hintSystem, scale);
         }
-        this.#drawExitPortal(col, sliceTop, sliceHeight, perpDist, rayAngle, player, exitRow, exitCol);
+        this.#drawExitPortal(col, sliceTop, sliceHeight, perpDist, rayAngle, player, exitRow, exitCol, scale);
       }
     }
   }
@@ -326,7 +336,7 @@ class RaycastRenderer {
   }
 
   /** Render a glowing portal effect on the floor at the exit tile */
-  #drawExitPortal(col, sliceTop, sliceHeight, perpDist, rayAngle, player, exitRow, exitCol) {
+  #drawExitPortal(col, sliceTop, sliceHeight, perpDist, rayAngle, player, exitRow, exitCol, sliceWidth = 1) {
     if (perpDist > 10) return;
 
     const ctx = this.ctx;
@@ -364,7 +374,7 @@ class RaycastRenderer {
         } else {
           ctx.fillStyle = `rgba(255, 150, 0, ${alpha * 0.4})`;
         }
-        ctx.fillRect(col, y, 1, step);
+        ctx.fillRect(col, y, sliceWidth, step);
       }
     }
   }
@@ -449,35 +459,36 @@ class RaycastRenderer {
    * @param {string} color — base color hex
    * @param {number} shade — brightness 0..1
    * @param {boolean} isExit — draw with glow effect
+   * @param {number} [sliceWidth=1] — width of each wall slice in pixels
    */
-  #drawWallSlice(x, top, height, color, shade, isExit) {
+  #drawWallSlice(x, top, height, color, shade, isExit, sliceWidth = 1) {
     const ctx = this.ctx;
     // Edge thickness proportional to wall height (closer = thicker edges)
     const edgeThick = Math.max(1, Math.round(height / 60));
 
     if (isExit) {
       ctx.fillStyle = this.#applyShade(COLORS.exit, shade);
-      ctx.fillRect(x, top, 1, height);
+      ctx.fillRect(x, top, sliceWidth, height);
       ctx.fillStyle = this.#applyShade(COLORS.exitGlow, shade * VISUAL.maxShadeBoost);
-      ctx.fillRect(x, top, 1, edgeThick * 2);
-      ctx.fillRect(x, top + height - edgeThick * 2, 1, edgeThick * 2);
+      ctx.fillRect(x, top, sliceWidth, edgeThick * 2);
+      ctx.fillRect(x, top + height - edgeThick * 2, sliceWidth, edgeThick * 2);
     } else {
       const shadedColor = this.#applyShade(color, shade);
 
       // Solid fill with visible depth shading
       ctx.fillStyle = this.#applyShade(color, shade * VISUAL.depthFillMultiplier * 2.5);
-      ctx.fillRect(x, top, 1, height);
+      ctx.fillRect(x, top, sliceWidth, height);
 
       // Top and bottom edges — proportional thickness
       ctx.fillStyle = shadedColor;
-      ctx.fillRect(x, top, 1, edgeThick);
-      ctx.fillRect(x, top + height - edgeThick, 1, edgeThick);
+      ctx.fillRect(x, top, sliceWidth, edgeThick);
+      ctx.fillRect(x, top + height - edgeThick, sliceWidth, edgeThick);
 
       // Vertical accent lines for wireframe structure
       if (x % VISUAL.accentColumnInterval === 0) {
         ctx.globalAlpha = shade * VISUAL.accentOpacity * 1.5;
         ctx.fillStyle = color;
-        ctx.fillRect(x, top, 1, height);
+        ctx.fillRect(x, top, sliceWidth, height);
         ctx.globalAlpha = 1.0;
       }
     }
@@ -524,7 +535,7 @@ class RaycastRenderer {
    * @param {Object} player — { x, y, angle }
    * @param {import('./hint.js').HintSystem} hintSystem
    */
-  #drawCarpetFloorStrip(col, sliceTop, sliceHeight, perpDist, rayAngle, player, hintSystem) {
+  #drawCarpetFloorStrip(col, sliceTop, sliceHeight, perpDist, rayAngle, player, hintSystem, sliceWidth = 1) {
     const ctx = this.ctx;
     const pitchOffset = (player.pitch || 0) * this.height;
     const halfH = this.height / 2 + pitchOffset;
@@ -560,7 +571,7 @@ class RaycastRenderer {
         // Distance-based fade for subtle appearance
         const fade = Math.max(0.2, 1.0 - worldDist / maxDist);
         ctx.fillStyle = this.#applyShade(COLORS.carpet, fade * 0.7);
-        ctx.fillRect(col, y, 1, step);
+        ctx.fillRect(col, y, sliceWidth, step);
       }
     }
   }

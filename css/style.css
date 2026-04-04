@@ -16,6 +16,10 @@ html, body {
   background: #050510;
   color: #cccccc;
   font-family: 'Courier New', monospace;
+  /* Prevent pull-to-refresh and overscroll on mobile */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: none;
+  touch-action: none;
 }
 
 body {
@@ -28,6 +32,8 @@ body {
 #game-canvas {
   display: block;
   image-rendering: pixelated;
+  /* Safe area padding for notch devices */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 /* [Fix 12] Removed dead #game-canvas::after rule — ::after pseudo-elements
@@ -58,4 +64,23 @@ body {
   font-size: 11px;
   color: #008888;
   background: #0a0a1a;
+}
+
+/* Orientation overlay — shown in portrait mode on mobile */
+#orientation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #050510;
+  color: #00cccc;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  font-family: monospace;
+  font-size: 18px;
+  line-height: 2;
+  z-index: 9999;
 }

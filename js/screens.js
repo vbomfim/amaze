@@ -76,9 +76,10 @@ function drawCenteredText(ctx, text, x, y, color, font) {
  * @param {boolean} selected — if true, draw highlighted
  * @param {boolean} enabled — if false, draw dimmed
  */
-function drawButton(ctx, text, cx, cy, selected, enabled, btnIndex) {
-  const width = 260;
-  const height = 36;
+function drawButton(ctx, text, cx, cy, selected, enabled, btnIndex, options = {}) {
+  const width = options.buttonWidth || 260;
+  const height = options.buttonHeight || 36;
+  const fontSize = options.fontSize || 16;
   const x = cx - width / 2;
   const y = cy - height / 2;
 
@@ -95,7 +96,7 @@ function drawButton(ctx, text, cx, cy, selected, enabled, btnIndex) {
   ctx.lineWidth = selected ? 2 : 1;
   ctx.strokeRect(x, y, width, height);
 
-  ctx.font = '16px monospace';
+  ctx.font = `${fontSize}px monospace`;
   ctx.fillStyle = enabled ? (selected ? SCREEN_COLORS.primary : SCREEN_COLORS.text) : SCREEN_COLORS.textDim;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -116,32 +117,41 @@ function drawStartScreen(ctx, w, h, data) {
   resetButtonRects();
   const cx = w / 2;
 
+  // Responsive sizing
+  const btnW = Math.min(260, Math.round(w * 0.6));
+  const btnH = Math.max(44, Math.round(h * 0.065));
+  const btnFontSize = Math.max(12, Math.round(h * 0.025));
+  const titleFontSize = Math.max(28, Math.round(h * 0.083));
+  const subtitleFontSize = Math.max(10, Math.round(h * 0.021));
+  const instrFontSize = Math.max(10, Math.round(h * 0.019));
+  const btnOpts = { buttonWidth: btnW, buttonHeight: btnH, fontSize: btnFontSize };
+
   // Background
   ctx.fillStyle = SCREEN_COLORS.background;
   ctx.fillRect(0, 0, w, h);
 
   // Title
-  drawCenteredText(ctx, '🐭 aMaze', cx, h * 0.2, SCREEN_COLORS.primary, 'bold 56px monospace');
+  drawCenteredText(ctx, '🐭 aMaze', cx, h * 0.2, SCREEN_COLORS.primary, `bold ${titleFontSize}px monospace`);
 
   // Subtitle
-  drawCenteredText(ctx, 'Find your way through the maze', cx, h * 0.2 + 50, SCREEN_COLORS.textDim, '14px monospace');
+  drawCenteredText(ctx, 'Find your way through the maze', cx, h * 0.2 + titleFontSize + 10, SCREEN_COLORS.textDim, `${subtitleFontSize}px monospace`);
 
   // Menu buttons
   const buttonStartY = h * 0.42;
-  const buttonSpacing = 50;
+  const buttonSpacing = btnH + Math.max(10, Math.round(h * 0.02));
   let btnIdx = 0;
 
-  drawButton(ctx, 'New Game (N / Enter)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true, btnIdx);
+  drawButton(ctx, 'New Game (N / Enter)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true, btnIdx, btnOpts);
   btnIdx++;
 
-  drawButton(ctx, 'Continue (C)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, data.canContinue, btnIdx);
+  drawButton(ctx, 'Continue (C)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, data.canContinue, btnIdx, btnOpts);
   btnIdx++;
 
-  drawButton(ctx, 'PAC-MAN Mode (P)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true, btnIdx);
+  drawButton(ctx, 'PAC-MAN Mode (P)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true, btnIdx, btnOpts);
   btnIdx++;
 
   if (data.canLevelSelect) {
-    drawButton(ctx, 'Level Select (L)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true, btnIdx);
+    drawButton(ctx, 'Level Select (L)', cx, buttonStartY + buttonSpacing * btnIdx, data.selectedIndex === btnIdx, true, btnIdx, btnOpts);
     btnIdx++;
   }
 
@@ -152,12 +162,12 @@ function drawStartScreen(ctx, w, h, data) {
     'H — Hint  ·  M — Minimap  ·  ESC — Pause',
   ];
   instrLines.forEach((line, i) => {
-    drawCenteredText(ctx, line, cx, instrY + i * 22, SCREEN_COLORS.textDim, '13px monospace');
+    drawCenteredText(ctx, line, cx, instrY + i * (instrFontSize + 8), SCREEN_COLORS.textDim, `${instrFontSize}px monospace`);
   });
 
   // High score
   if (data.highScore > 0) {
-    drawCenteredText(ctx, `High Score: ${data.highScore.toLocaleString()}`, cx, h * 0.9, SCREEN_COLORS.accent, '16px monospace');
+    drawCenteredText(ctx, `High Score: ${data.highScore.toLocaleString()}`, cx, h * 0.9, SCREEN_COLORS.accent, `${btnFontSize}px monospace`);
   }
 }
 
@@ -174,19 +184,28 @@ function drawLevelCompleteScreen(ctx, w, h, result) {
   resetButtonRects();
   const cx = w / 2;
 
+  // Responsive sizing
+  const btnW = Math.min(260, Math.round(w * 0.6));
+  const btnH = Math.max(44, Math.round(h * 0.065));
+  const btnFontSize = Math.max(12, Math.round(h * 0.025));
+  const headerFontSize = Math.max(22, Math.round(h * 0.059));
+  const bodyFontSize = Math.max(12, Math.round(h * 0.024));
+  const scoreFontSize = Math.max(14, Math.round(h * 0.033));
+  const btnOpts = { buttonWidth: btnW, buttonHeight: btnH, fontSize: btnFontSize };
+
   // Semi-transparent overlay
   ctx.fillStyle = SCREEN_COLORS.overlay;
   ctx.fillRect(0, 0, w, h);
 
   // Header
-  drawCenteredText(ctx, '✨ Level Complete!', cx, h * 0.18, SCREEN_COLORS.accent, 'bold 40px monospace');
+  drawCenteredText(ctx, '✨ Level Complete!', cx, h * 0.18, SCREEN_COLORS.accent, `bold ${headerFontSize}px monospace`);
 
   // Level number
-  drawCenteredText(ctx, `Level ${result.level}`, cx, h * 0.28, SCREEN_COLORS.primary, '20px monospace');
+  drawCenteredText(ctx, `Level ${result.level}`, cx, h * 0.28, SCREEN_COLORS.primary, `${Math.round(bodyFontSize * 1.25)}px monospace`);
 
   // Stats
   const statsY = h * 0.38;
-  const lineH = 28;
+  const lineH = Math.max(22, Math.round(h * 0.042));
 
   // Use pre-formatted time string from completeLevel result [Fix 9]
   const timeStr = result.timeStr || (() => {
@@ -195,22 +214,22 @@ function drawLevelCompleteScreen(ctx, w, h, result) {
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   })();
 
-  drawCenteredText(ctx, `Time: ${timeStr}`, cx, statsY, SCREEN_COLORS.text, '16px monospace');
-  drawCenteredText(ctx, `Hints Used: ${result.hintsUsed}`, cx, statsY + lineH, SCREEN_COLORS.text, '16px monospace');
+  drawCenteredText(ctx, `Time: ${timeStr}`, cx, statsY, SCREEN_COLORS.text, `${bodyFontSize}px monospace`);
+  drawCenteredText(ctx, `Hints Used: ${result.hintsUsed}`, cx, statsY + lineH, SCREEN_COLORS.text, `${bodyFontSize}px monospace`);
 
   // Score breakdown
   const breakdownY = statsY + lineH * 3;
   const bd = result.breakdown;
-  drawCenteredText(ctx, 'Score Breakdown', cx, breakdownY, SCREEN_COLORS.primary, 'bold 16px monospace');
-  drawCenteredText(ctx, `Base: ${bd.basePoints}  ×  Level: ${bd.levelMultiplier.toFixed(1)}`, cx, breakdownY + lineH, SCREEN_COLORS.textDim, '14px monospace');
-  drawCenteredText(ctx, `Hint Factor: ${bd.hintFactor.toFixed(2)}  ×  Time Bonus: ${bd.timeBonus.toFixed(2)}`, cx, breakdownY + lineH * 2, SCREEN_COLORS.textDim, '14px monospace');
+  drawCenteredText(ctx, 'Score Breakdown', cx, breakdownY, SCREEN_COLORS.primary, `bold ${bodyFontSize}px monospace`);
+  drawCenteredText(ctx, `Base: ${bd.basePoints}  ×  Level: ${bd.levelMultiplier.toFixed(1)}`, cx, breakdownY + lineH, SCREEN_COLORS.textDim, `${Math.round(bodyFontSize * 0.875)}px monospace`);
+  drawCenteredText(ctx, `Hint Factor: ${bd.hintFactor.toFixed(2)}  ×  Time Bonus: ${bd.timeBonus.toFixed(2)}`, cx, breakdownY + lineH * 2, SCREEN_COLORS.textDim, `${Math.round(bodyFontSize * 0.875)}px monospace`);
 
   // Final score
-  drawCenteredText(ctx, `Level Score: ${result.score.toLocaleString()}`, cx, breakdownY + lineH * 3.5, SCREEN_COLORS.accent, 'bold 22px monospace');
-  drawCenteredText(ctx, `Total Score: ${result.totalScore.toLocaleString()}`, cx, breakdownY + lineH * 4.5, SCREEN_COLORS.primary, '18px monospace');
+  drawCenteredText(ctx, `Level Score: ${result.score.toLocaleString()}`, cx, breakdownY + lineH * 3.5, SCREEN_COLORS.accent, `bold ${scoreFontSize}px monospace`);
+  drawCenteredText(ctx, `Total Score: ${result.totalScore.toLocaleString()}`, cx, breakdownY + lineH * 4.5, SCREEN_COLORS.primary, `${Math.round(scoreFontSize * 0.82)}px monospace`);
 
   // Continue prompt
-    drawButton(ctx, 'Next Level → (Enter)', cx, h * 0.88, true, true, 0);
+    drawButton(ctx, 'Next Level → (Enter)', cx, h * 0.88, true, true, 0, btnOpts);
 }
 
 // ── Pause Menu [AC19] ───────────────────────────────────────
@@ -226,19 +245,26 @@ function drawPauseScreen(ctx, w, h, data) {
   resetButtonRects();
   const cx = w / 2;
 
+  // Responsive sizing
+  const btnW = Math.min(260, Math.round(w * 0.6));
+  const btnH = Math.max(44, Math.round(h * 0.065));
+  const btnFontSize = Math.max(12, Math.round(h * 0.025));
+  const headerFontSize = Math.max(24, Math.round(h * 0.062));
+  const btnOpts = { buttonWidth: btnW, buttonHeight: btnH, fontSize: btnFontSize };
+
   // Semi-transparent overlay
   ctx.fillStyle = SCREEN_COLORS.overlay;
   ctx.fillRect(0, 0, w, h);
 
   // Header
-  drawCenteredText(ctx, '⏸ PAUSED', cx, h * 0.3, SCREEN_COLORS.primary, 'bold 42px monospace');
+  drawCenteredText(ctx, '⏸ PAUSED', cx, h * 0.3, SCREEN_COLORS.primary, `bold ${headerFontSize}px monospace`);
 
   // Buttons
   const btnY = h * 0.48;
-  const spacing = 50;
-  drawButton(ctx, 'Resume (ESC / P / Enter)', cx, btnY, data.selectedIndex === 0, true, 0);
-  drawButton(ctx, 'Restart Level (R)', cx, btnY + spacing, data.selectedIndex === 1, true, 1);
-  drawButton(ctx, 'Quit to Menu (Q)', cx, btnY + spacing * 2, data.selectedIndex === 2, true, 2);
+  const spacing = btnH + Math.max(10, Math.round(h * 0.02));
+  drawButton(ctx, 'Resume (ESC / P / Enter)', cx, btnY, data.selectedIndex === 0, true, 0, btnOpts);
+  drawButton(ctx, 'Restart Level (R)', cx, btnY + spacing, data.selectedIndex === 1, true, 1, btnOpts);
+  drawButton(ctx, 'Quit to Menu (Q)', cx, btnY + spacing * 2, data.selectedIndex === 2, true, 2, btnOpts);
 }
 
 // ── Level Select Screen ─────────────────────────────────────
@@ -334,23 +360,32 @@ function drawVictoryScreen(ctx, w, h, data) {
   resetButtonRects();
   const cx = w / 2;
 
+  // Responsive sizing
+  const btnW = Math.min(260, Math.round(w * 0.6));
+  const btnH = Math.max(44, Math.round(h * 0.065));
+  const btnFontSize = Math.max(12, Math.round(h * 0.025));
+  const headerFontSize = Math.max(24, Math.round(h * 0.065));
+  const subFontSize = Math.max(12, Math.round(h * 0.027));
+  const scoreFontSize = Math.max(16, Math.round(h * 0.039));
+  const btnOpts = { buttonWidth: btnW, buttonHeight: btnH, fontSize: btnFontSize };
+
   // Background
   ctx.fillStyle = SCREEN_COLORS.background;
   ctx.fillRect(0, 0, w, h);
 
   // Trophy header
-  drawCenteredText(ctx, '🏆 Congratulations!', cx, h * 0.2, SCREEN_COLORS.accent, 'bold 44px monospace');
-  drawCenteredText(ctx, 'You conquered all 50 levels!', cx, h * 0.2 + 50, SCREEN_COLORS.text, '18px monospace');
+  drawCenteredText(ctx, '🏆 Congratulations!', cx, h * 0.2, SCREEN_COLORS.accent, `bold ${headerFontSize}px monospace`);
+  drawCenteredText(ctx, 'You conquered all 50 levels!', cx, h * 0.2 + headerFontSize + 10, SCREEN_COLORS.text, `${subFontSize}px monospace`);
 
   // Scores
-  drawCenteredText(ctx, `Total Score: ${data.totalScore.toLocaleString()}`, cx, h * 0.45, SCREEN_COLORS.accent, 'bold 26px monospace');
-  drawCenteredText(ctx, `High Score: ${data.highScore.toLocaleString()}`, cx, h * 0.45 + 40, SCREEN_COLORS.primary, '20px monospace');
+  drawCenteredText(ctx, `Total Score: ${data.totalScore.toLocaleString()}`, cx, h * 0.45, SCREEN_COLORS.accent, `bold ${scoreFontSize}px monospace`);
+  drawCenteredText(ctx, `High Score: ${data.highScore.toLocaleString()}`, cx, h * 0.45 + scoreFontSize + 14, SCREEN_COLORS.primary, `${Math.round(scoreFontSize * 0.77)}px monospace`);
 
   // Buttons
   const btnY = h * 0.65;
-  const spacing = 50;
-  drawButton(ctx, 'Play Again (Enter)', cx, btnY, data.selectedIndex === 0, true, 0);
-  drawButton(ctx, 'Level Select (L)', cx, btnY + spacing, data.selectedIndex === 1, true, 1);
+  const spacing = btnH + Math.max(10, Math.round(h * 0.02));
+  drawButton(ctx, 'Play Again (Enter)', cx, btnY, data.selectedIndex === 0, true, 0, btnOpts);
+  drawButton(ctx, 'Level Select (L)', cx, btnY + spacing, data.selectedIndex === 1, true, 1, btnOpts);
 }
 
 export {

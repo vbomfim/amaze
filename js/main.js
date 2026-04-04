@@ -26,6 +26,13 @@ import {
   getHoveredButton,
 } from './screens.js';
 import { PacManMode } from './pacman-mode.js';
+import {
+  isTouchDevice,
+  isPortrait,
+  TouchInput,
+  getMobileRayScale,
+  getMobileSpriteMaxDist,
+} from './touch-input.js';
 
 /** Game configuration constants */
 const CONFIG = {
@@ -105,27 +112,58 @@ class Game {
     // PAC-MAN mode instance (created on first entry) [Phase 3]
     this.pacmanMode = null;
 
+    // ── Mobile support ────────────────────────────────────────
+    /** @type {boolean} Whether this is a touch-enabled device */
+    this._isMobile = isTouchDevice();
+    /** @type {TouchInput | null} Touch input handler (mobile only) */
+    this._touchInput = null;
+    /** @type {number} Ray scale factor for mobile performance */
+    this._rayScale = getMobileRayScale(this._isMobile);
+
     this.#setupCanvas();
-    this.renderer = new RaycastRenderer(this.canvas);
+    this.renderer = new RaycastRenderer(this.canvas, { rayScale: this._rayScale });
     // Cache HUD instance — avoid allocating every frame [Fix 3]
     this.hud = new HUD(this.renderer.ctx, this.canvas.width, this.canvas.height);
     this.#bindEvents();
+
+    // Set up touch input and orientation overlay for mobile
+    if (this._isMobile) {
+      this.#setupTouchInput();
+      this.#setupOrientationOverlay();
+      this.#hideControlsHint();
+    }
   }
 
-  /** Size canvas to fill viewport width (max 1200px) at 16:9. [AC: Responsive Resize] */
+  /** Size canvas to fill viewport width (max 1200px) at 16:9. Mobile fills full viewport. [AC: Responsive Resize] */
   #setupCanvas() {
     const maxW = window.innerWidth;
     const maxH = window.innerHeight - 10;
-    let width = maxW;
-    let height = Math.floor(width / CONFIG.aspectRatio);
-    if (height > maxH) {
-      height = maxH;
-      width = Math.floor(height * CONFIG.aspectRatio);
+
+    let width, height;
+
+    if (this._isMobile) {
+      // Mobile: fill full viewport, no aspect ratio constraint
+      width = window.innerWidth;
+      height = window.innerHeight;
+    } else {
+      // Desktop: maintain 16:9 aspect ratio
+      width = maxW;
+      height = Math.floor(width / CONFIG.aspectRatio);
+      if (height > maxH) {
+        height = maxH;
+        width = Math.floor(height * CONFIG.aspectRatio);
+      }
     }
+
     this.canvas.width = width;
     this.canvas.height = height;
     this.canvas.style.width = `${width}px`;
     this.canvas.style.height = `${height}px`;
+
+    // Update touch input dimensions on resize
+    if (this._touchInput) {
+      this._touchInput.updateDimensions(width, height);
+    }
   }
 
   /** Bind keyboard, visibility, and resize events. */
@@ -177,16 +215,21 @@ class Game {
     });
 
     // Handle window resize — debounced [Fix 7]
-    window.addEventListener('resize', () => {
+    const resizeHandler = () => {
       clearTimeout(this._resizeTimer);
       this._resizeTimer = setTimeout(() => {
         this.#setupCanvas();
-        this.renderer = new RaycastRenderer(this.canvas);
+        this.renderer = new RaycastRenderer(this.canvas, { rayScale: this._rayScale });
         this.hud = new HUD(this.renderer.ctx, this.canvas.width, this.canvas.height);
         this._pausedImageData = null;
         this._levelCompleteImageData = null;
       }, CONFIG.resizeDebounceMs);
-    });
+    };
+    window.addEventListener('resize', resizeHandler);
+    // Also listen for orientationchange on mobile
+    if (this._isMobile) {
+      window.addEventListener('orientationchange', resizeHandler);
+    }
   }
 
   /**
@@ -201,6 +244,71 @@ class Game {
     if (this.gsm.settings.muted === true) {
       this.audioManager.muted = true;
     }
+  }
+
+  // ── Mobile Support Methods ──────────────────────────────────
+
+  /** Set up touch input handler and bind to canvas. */
+  #setupTouchInput() {
+    this._touchInput = new TouchInput({
+      canvasWidth: this.canvas.width,
+      canvasHeight: this.canvas.height,
+    });
+    this._touchInput.bind(this.canvas);
+
+    // Initialize audio on first touch (browser autoplay policy)
+    this.canvas.addEventListener('touchstart', () => {
+      this.#initAudioOnce();
+    }, { once: true });
+  }
+
+  /** Create and manage portrait orientation overlay. */
+  #setupOrientationOverlay() {
+    // Create overlay element
+    const overlay = document.createElement('div');
+    overlay.id = 'orientation-overlay';
+    overlay.innerHTML = '🔄<br>Please rotate your device<br>to landscape';
+    overlay.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: #050510; color: #00cccc; display: none;
+      justify-content: center; align-items: center; text-align: center;
+      font-family: monospace; font-size: 18px; line-height: 2;
+      z-index: 9999;
+    `;
+    document.body.appendChild(overlay);
+    this._orientationOverlay = overlay;
+
+    // Try to lock to landscape
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {
+          // Silently ignore — not all browsers support orientation lock
+        });
+      }
+    } catch (_e) {
+      // Ignore
+    }
+
+    // Check orientation on load and on change
+    const checkOrientation = () => {
+      if (isPortrait(window.innerWidth, window.innerHeight)) {
+        overlay.style.display = 'flex';
+      } else {
+        overlay.style.display = 'none';
+      }
+    };
+
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(checkOrientation, 100); // Delay for orientation to settle
+    });
+    checkOrientation();
+  }
+
+  /** Hide the desktop controls hint on mobile. */
+  #hideControlsHint() {
+    const hint = document.querySelector('.controls-hint');
+    if (hint) hint.style.display = 'none';
   }
 
   /**
@@ -675,6 +783,14 @@ class Game {
     const dt = Math.min((timestamp - this.lastTime) / 1000, 0.05); // Cap at 50ms
     this.lastTime = timestamp;
 
+    // Feed touch input to player (mobile)
+    if (this._touchInput && this._touchInput.isActive) {
+      const input = this._touchInput.getInput();
+      this.player.setTouchInput(input.moveX, input.moveY, input.lookX);
+    } else if (this._touchInput) {
+      this.player.clearTouchInput();
+    }
+
     // Update player position
     this.player.update(dt);
 
@@ -739,6 +855,12 @@ class Game {
     if (this._showFps) {
       this.#updateFps(timestamp);
       this.renderer.drawFpsCounter(this._fpsDisplay);
+    }
+
+    // Render touch joystick overlays (mobile)
+    if (this._touchInput) {
+      this._touchInput.updateFade(dt);
+      this._touchInput.render(this.renderer.ctx);
     }
 
     // Check win condition

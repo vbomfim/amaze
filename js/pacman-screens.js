@@ -36,9 +36,10 @@ function resetPacButtonRects() {
 /**
  * Draw a PAC-MAN button (same visual as screens.js buttons).
  */
-function drawPacButton(ctx, text, cx, cy, selected, enabled, btnIndex) {
-  const width = 260;
-  const height = 36;
+function drawPacButton(ctx, text, cx, cy, selected, enabled, btnIndex, options = {}) {
+  const width = options.buttonWidth || 260;
+  const height = options.buttonHeight || 36;
+  const fontSize = options.fontSize || 16;
   const x = cx - width / 2;
   const y = cy - height / 2;
 
@@ -54,7 +55,7 @@ function drawPacButton(ctx, text, cx, cy, selected, enabled, btnIndex) {
   ctx.lineWidth = selected ? 2 : 1;
   ctx.strokeRect(x, y, width, height);
 
-  ctx.font = '16px monospace';
+  ctx.font = `${fontSize}px monospace`;
   ctx.fillStyle = enabled
     ? (selected ? SCREEN_COLORS.primary : SCREEN_COLORS.text)
     : SCREEN_COLORS.textDim;
@@ -96,6 +97,8 @@ function getHoveredPacButton(canvasX, canvasY) {
  */
 function drawPacManReadyScreen(ctx, w, h) {
   const cx = w / 2;
+  const readyFontSize = Math.max(32, Math.round(h * 0.095));
+  const subFontSize = Math.max(12, Math.round(h * 0.027));
 
   // Semi-transparent overlay
   ctx.save();
@@ -104,8 +107,8 @@ function drawPacManReadyScreen(ctx, w, h) {
   ctx.restore();
 
   // "READY!" text
-  drawCentered(ctx, 'READY!', cx, h * 0.45, '#ffcc00', 'bold 64px monospace');
-  drawCentered(ctx, 'Get ready...', cx, h * 0.55, SCREEN_COLORS.textDim, '18px monospace');
+  drawCentered(ctx, 'READY!', cx, h * 0.45, '#ffcc00', `bold ${readyFontSize}px monospace`);
+  drawCentered(ctx, 'Get ready...', cx, h * 0.55, SCREEN_COLORS.textDim, `${subFontSize}px monospace`);
 }
 
 // ── DYING Overlay ──────────────────────────────────────────────
@@ -156,10 +159,10 @@ function drawPacManLevelClearScreen(ctx, w, h, data) {
   ctx.fillRect(0, 0, w, h);
   ctx.restore();
 
-  drawCentered(ctx, '✨ LEVEL CLEAR!', cx, h * 0.35, '#ffcc00', 'bold 48px monospace');
-  drawCentered(ctx, `Level ${data.level} Complete`, cx, h * 0.48, SCREEN_COLORS.primary, '22px monospace');
-  drawCentered(ctx, `Score: ${data.score.toLocaleString()}`, cx, h * 0.58, SCREEN_COLORS.text, '20px monospace');
-  drawCentered(ctx, 'Next level starting...', cx, h * 0.68, SCREEN_COLORS.textDim, '14px monospace');
+  drawCentered(ctx, '✨ LEVEL CLEAR!', cx, h * 0.35, '#ffcc00', `bold ${Math.max(24, Math.round(h * 0.071))}px monospace`);
+  drawCentered(ctx, `Level ${data.level} Complete`, cx, h * 0.48, SCREEN_COLORS.primary, `${Math.max(14, Math.round(h * 0.033))}px monospace`);
+  drawCentered(ctx, `Score: ${data.score.toLocaleString()}`, cx, h * 0.58, SCREEN_COLORS.text, `${Math.max(12, Math.round(h * 0.030))}px monospace`);
+  drawCentered(ctx, 'Next level starting...', cx, h * 0.68, SCREEN_COLORS.textDim, `${Math.max(10, Math.round(h * 0.021))}px monospace`);
 }
 
 // ── GAME OVER Screen ───────────────────────────────────────────
@@ -175,27 +178,36 @@ function drawPacManGameOverScreen(ctx, w, h, data) {
   resetPacButtonRects();
   const cx = w / 2;
 
+  // Responsive sizing
+  const btnW = Math.min(260, Math.round(w * 0.6));
+  const btnH = Math.max(44, Math.round(h * 0.065));
+  const btnFontSize = Math.max(12, Math.round(h * 0.025));
+  const headerFontSize = Math.max(28, Math.round(h * 0.083));
+  const scoreFontSize = Math.max(14, Math.round(h * 0.036));
+  const hiFontSize = Math.max(12, Math.round(h * 0.030));
+  const btnOpts = { buttonWidth: btnW, buttonHeight: btnH, fontSize: btnFontSize };
+
   // Full background
   ctx.fillStyle = SCREEN_COLORS.background;
   ctx.fillRect(0, 0, w, h);
 
   // Header
-  drawCentered(ctx, 'GAME OVER', cx, h * 0.2, '#ff3333', 'bold 56px monospace');
+  drawCentered(ctx, 'GAME OVER', cx, h * 0.2, '#ff3333', `bold ${headerFontSize}px monospace`);
 
   // Scores
-  drawCentered(ctx, `Score: ${data.score.toLocaleString()}`, cx, h * 0.38, SCREEN_COLORS.text, '24px monospace');
-  drawCentered(ctx, `High Score: ${data.highScore.toLocaleString()}`, cx, h * 0.48, SCREEN_COLORS.accent, '20px monospace');
+  drawCentered(ctx, `Score: ${data.score.toLocaleString()}`, cx, h * 0.38, SCREEN_COLORS.text, `${scoreFontSize}px monospace`);
+  drawCentered(ctx, `High Score: ${data.highScore.toLocaleString()}`, cx, h * 0.48, SCREEN_COLORS.accent, `${hiFontSize}px monospace`);
 
   // New high score indicator
   if (data.score >= data.highScore && data.score > 0) {
-    drawCentered(ctx, '🏆 NEW HIGH SCORE!', cx, h * 0.55, '#ffcc00', 'bold 18px monospace');
+    drawCentered(ctx, '🏆 NEW HIGH SCORE!', cx, h * 0.55, '#ffcc00', `bold ${Math.round(hiFontSize * 0.9)}px monospace`);
   }
 
   // Buttons
   const btnY = h * 0.68;
-  const spacing = 50;
-  drawPacButton(ctx, 'Play Again (Enter)', cx, btnY, data.selectedIndex === 0, true, 0);
-  drawPacButton(ctx, 'Back to Menu (Q)', cx, btnY + spacing, data.selectedIndex === 1, true, 1);
+  const spacing = btnH + Math.max(10, Math.round(h * 0.02));
+  drawPacButton(ctx, 'Play Again (Enter)', cx, btnY, data.selectedIndex === 0, true, 0, btnOpts);
+  drawPacButton(ctx, 'Back to Menu (Q)', cx, btnY + spacing, data.selectedIndex === 1, true, 1, btnOpts);
 }
 
 // ── PAUSE Screen ───────────────────────────────────────────────
@@ -211,19 +223,26 @@ function drawPacManPauseScreen(ctx, w, h, data) {
   resetPacButtonRects();
   const cx = w / 2;
 
+  // Responsive sizing
+  const btnW = Math.min(260, Math.round(w * 0.6));
+  const btnH = Math.max(44, Math.round(h * 0.065));
+  const btnFontSize = Math.max(12, Math.round(h * 0.025));
+  const headerFontSize = Math.max(24, Math.round(h * 0.062));
+  const btnOpts = { buttonWidth: btnW, buttonHeight: btnH, fontSize: btnFontSize };
+
   // Semi-transparent overlay
   ctx.fillStyle = SCREEN_COLORS.overlay;
   ctx.fillRect(0, 0, w, h);
 
   // Header
-  drawCentered(ctx, '⏸ PAUSED', cx, h * 0.3, SCREEN_COLORS.primary, 'bold 42px monospace');
+  drawCentered(ctx, '⏸ PAUSED', cx, h * 0.3, SCREEN_COLORS.primary, `bold ${headerFontSize}px monospace`);
 
   // Buttons
   const btnY = h * 0.48;
-  const spacing = 50;
-  drawPacButton(ctx, 'Resume (ESC / P)', cx, btnY, data.selectedIndex === 0, true, 0);
-  drawPacButton(ctx, 'Restart (R)', cx, btnY + spacing, data.selectedIndex === 1, true, 1);
-  drawPacButton(ctx, 'Quit to Menu (Q)', cx, btnY + spacing * 2, data.selectedIndex === 2, true, 2);
+  const spacing = btnH + Math.max(10, Math.round(h * 0.02));
+  drawPacButton(ctx, 'Resume (ESC / P)', cx, btnY, data.selectedIndex === 0, true, 0, btnOpts);
+  drawPacButton(ctx, 'Restart (R)', cx, btnY + spacing, data.selectedIndex === 1, true, 1, btnOpts);
+  drawPacButton(ctx, 'Quit to Menu (Q)', cx, btnY + spacing * 2, data.selectedIndex === 2, true, 2, btnOpts);
 }
 
 // ── PAC-MAN HUD ────────────────────────────────────────────────
@@ -237,35 +256,40 @@ function drawPacManPauseScreen(ctx, w, h, data) {
  */
 function drawPacManHUD(ctx, w, h, data) {
   ctx.save();
-  const pad = 15;
+  const pad = Math.max(10, Math.round(w * 0.012));
+  const scoreFontSize = Math.max(16, Math.round(h * 0.036));
+  const hiFontSize = Math.max(10, Math.round(h * 0.021));
+  const lvlFontSize = Math.max(12, Math.round(h * 0.024));
+  const dotsFontSize = Math.max(10, Math.round(h * 0.018));
+  const livesFontSize = Math.max(14, Math.round(h * 0.030));
 
   // ── Score (top-center, large)
-  ctx.font = 'bold 24px monospace';
+  ctx.font = `bold ${scoreFontSize}px monospace`;
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(data.score.toLocaleString(), w / 2, pad);
 
   // ── High Score (top-right)
-  ctx.font = '14px monospace';
+  ctx.font = `${hiFontSize}px monospace`;
   ctx.fillStyle = 'rgba(0, 204, 204, 0.7)';
   ctx.textAlign = 'right';
   ctx.fillText(`HI: ${data.highScore.toLocaleString()}`, w - pad, pad);
 
   // ── Level (top-left)
-  ctx.font = '16px monospace';
+  ctx.font = `${lvlFontSize}px monospace`;
   ctx.fillStyle = 'rgba(0, 204, 204, 0.7)';
   ctx.textAlign = 'left';
   ctx.fillText(`LVL ${data.level}`, pad, pad);
 
   // ── Dots remaining (below score)
-  ctx.font = '12px monospace';
+  ctx.font = `${dotsFontSize}px monospace`;
   ctx.fillStyle = 'rgba(255, 204, 0, 0.6)';
   ctx.textAlign = 'center';
-  ctx.fillText(`${data.dotsRemaining} dots`, w / 2, pad + 28);
+  ctx.fillText(`${data.dotsRemaining} dots`, w / 2, pad + scoreFontSize + 4);
 
   // ── Lives (bottom-left — mouse emoji × remaining)
-  ctx.font = '20px monospace';
+  ctx.font = `${livesFontSize}px monospace`;
   ctx.fillStyle = '#ffcc00';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'bottom';

@@ -28,6 +28,12 @@ import {
   getPacButtonAtPoint,
   getHoveredPacButton,
 } from './pacman-screens.js';
+import {
+  isTouchDevice,
+  TouchInput,
+  getMobileRayScale,
+  getMobileSpriteMaxDist,
+} from './touch-input.js';
 
 // ── Constants ──────────────────────────────────────────────────
 
@@ -128,6 +134,22 @@ class PacManMode {
     // Cached paused ImageData (avoids re-raycasting while paused)
     this._pausedImageData = null;
 
+    // ── Mobile support ────────────────────────────────────────
+    /** @type {boolean} */
+    this._isMobile = isTouchDevice();
+    /** @type {number} Ray scale for mobile perf */
+    this._rayScale = getMobileRayScale(this._isMobile);
+    /** @type {TouchInput | null} */
+    this._touchInput = null;
+
+    if (this._isMobile && typeof document !== 'undefined') {
+      this._touchInput = new TouchInput({
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height,
+      });
+      this._touchInput.bind(canvas);
+    }
+
     // Load high score from storage
     this.highScore = 0;
     this.#loadHighScore();
@@ -174,11 +196,12 @@ class PacManMode {
     this.tileMap = mazeData.map;
 
     // Create renderer
-    this.renderer = new RaycastRenderer(this.canvas);
+    this.renderer = new RaycastRenderer(this.canvas, { rayScale: this._rayScale });
     this.spriteRenderer = new SpriteRenderer(
       this.renderer.ctx,
       this.canvas.width,
-      this.canvas.height
+      this.canvas.height,
+      { maxSpriteDist: getMobileSpriteMaxDist(this._isMobile) }
     );
 
     // Create collectibles
@@ -338,6 +361,14 @@ class PacManMode {
    * @param {number} dt — delta time in seconds
    */
   #updatePlaying(dt) {
+    // Feed touch input to player (mobile)
+    if (this._touchInput && this._touchInput.isActive) {
+      const input = this._touchInput.getInput();
+      this.player.setTouchInput(input.moveX, input.moveY, input.lookX);
+    } else if (this._touchInput) {
+      this.player.clearTouchInput();
+    }
+
     // 1. Update player movement
     this.player.update(dt);
 
@@ -380,6 +411,12 @@ class PacManMode {
     // 8. Render
     this.#renderGameView();
     this.#renderHUD();
+
+    // 9. Render touch joystick overlays (mobile)
+    if (this._touchInput) {
+      this._touchInput.updateFade(dt);
+      this._touchInput.render(this.renderer.ctx);
+    }
   }
 
   /**
