@@ -63,34 +63,14 @@ class PacManMazeGenerator {
    * }}
    */
   generate() {
-    // Work on left half + center column, then mirror
-    const map = this.#createEmptyMap();
+    // Use a hand-designed template for classic arcade feel
+    const map = this.#createTemplateMap();
+    const ghostHouse = this.#findGhostHouse(map);
 
-    // Step 1: Carve corridors on left half using randomized Kruskal's
-    this.#carveCorridors(map);
-
-    // Step 2: Mirror left half to right half
-    this.#mirrorLeftToRight(map);
-
-    // Step 3: Add extra loops
-    this.#addLoops(map);
-
-    // Step 4: Remove dead ends
-    this.#removeDeadEnds(map);
-
-    // Step 5: Carve ghost house
-    const ghostHouse = this.#carveGhostHouse(map);
-
-    // Step 6: Ensure connectivity
-    this.#ensureConnectivity(map);
-
-    // Determine start position (bottom center area, below ghost house)
     const startRow = this.height - 2;
     const startCol = Math.floor(this.width / 2);
-    // Ensure start is open
     map[startRow][startCol] = 0;
 
-    // Generate dot and power pellet positions
     const powerPelletPositions = this.#generatePowerPelletPositions(map);
     const dotPositions = this.#generateDotPositions(map, ghostHouse, startRow, startCol, powerPelletPositions);
 
@@ -102,6 +82,168 @@ class PacManMazeGenerator {
       dotPositions,
       powerPelletPositions,
     };
+  }
+
+  /**
+   * Create an original PAC-MAN-style template maze.
+   * Symmetrical, with ghost house, side tunnels, T-intersections.
+   * Each template is for the LEFT half — mirrored to make the full maze.
+   */
+  #createTemplateMap() {
+    // Templates: left-half rows (including center column).
+    // 1=wall, 0=open. Each is mirrored left-to-right for full width.
+    // Width = 2 * halfWidth - 1 (center column shared)
+    const templates = [
+      this.#template21x21(),
+      this.#template25x25(),
+      this.#template29x29(),
+    ];
+
+    // Pick template closest to requested size, or fallback to procedural
+    let template = null;
+    for (const t of templates) {
+      if (t.length === this.height && (t[0].length * 2 - 1) === this.width) {
+        template = t;
+        break;
+      }
+    }
+
+    if (!template) {
+      // Fallback to procedural generation for non-template sizes
+      return this.#createProceduralMap();
+    }
+
+    // Mirror left half to create full map
+    const map = [];
+    for (let r = 0; r < template.length; r++) {
+      const left = template[r];
+      const right = [...left].reverse();
+      // Merge: left half + right half (skip center column duplicate)
+      map[r] = [...left, ...right.slice(1)];
+    }
+    return map;
+  }
+
+  /** Find ghost house bounds in the map (region of 2s or known position) */
+  #findGhostHouse(map) {
+    const midR = Math.floor(this.height / 2);
+    const midC = Math.floor(this.width / 2);
+    // Ghost house is 5 wide × 3 tall centered in the map
+    return {
+      row: midR - 1,
+      col: midC - 2,
+      width: 5,
+      height: 3,
+    };
+  }
+
+  /** 21×21 template (left half = 11 columns) — original arcade-style design */
+  #template21x21() {
+    // W=wall(1), O=open(0). Left half including center column.
+    // Mirror creates the right half.
+    return [
+      [1,1,1,1,1,1,1,1,1,1,1],
+      [1,0,0,0,0,1,0,0,0,0,1],
+      [1,0,1,1,0,1,0,1,1,0,1],
+      [1,0,0,0,0,0,0,0,0,0,1],
+      [1,0,1,1,0,1,1,1,0,1,1],
+      [1,0,0,0,0,1,0,0,0,0,0],
+      [1,1,1,1,0,1,0,1,1,0,1],
+      [0,0,0,0,0,0,0,0,1,0,1],
+      [1,1,1,1,0,1,0,0,0,0,1],
+      [1,0,0,0,0,1,1,1,0,1,1],
+      [1,0,1,1,0,0,0,0,0,0,1],
+      [1,0,0,1,0,1,1,1,0,1,1],
+      [1,1,0,0,0,1,0,0,0,0,0],
+      [1,0,0,1,0,1,0,1,1,0,1],
+      [1,0,1,1,0,0,0,0,1,0,1],
+      [1,0,0,0,0,1,0,0,0,0,1],
+      [1,0,1,1,1,1,0,1,1,0,1],
+      [1,0,0,0,0,0,0,0,0,0,1],
+      [1,0,1,0,1,1,1,1,0,1,1],
+      [1,0,0,0,0,0,0,0,0,0,1],
+      [1,1,1,1,1,1,1,1,1,1,1],
+    ];
+  }
+
+  /** 25×25 template (left half = 13 columns) */
+  #template25x25() {
+    return [
+      [1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,1,1,0,1,1,1,0,1,1,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,1,1,0,1,0,1,0,1,1,0,1],
+      [1,0,0,0,0,1,0,1,0,0,0,0,1],
+      [1,1,1,1,0,1,0,0,0,1,1,1,1],
+      [0,0,0,1,0,1,0,1,0,1,0,0,0],
+      [1,1,0,0,0,0,0,1,0,0,0,1,1],
+      [0,0,0,1,0,1,1,1,0,1,0,0,0],
+      [1,1,1,1,0,0,0,0,0,1,1,1,1],
+      [1,0,0,0,0,1,0,1,0,0,0,0,1],
+      [1,0,1,1,0,0,0,0,0,1,1,0,1],
+      [1,0,0,1,0,1,0,1,0,1,0,0,1],
+      [1,1,0,0,0,1,0,1,0,0,0,1,1],
+      [0,0,0,1,0,0,0,0,0,1,0,0,0],
+      [1,1,0,1,0,1,1,1,0,1,0,1,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,1,1,1,1,0,1,1,1,1,0,1],
+      [1,0,0,0,1,0,0,0,1,0,0,0,1],
+      [1,0,1,0,0,0,1,0,0,0,1,0,1],
+      [1,0,1,0,1,0,1,0,1,0,1,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,1,1,0,1,1,1,0,1,1,0,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1],
+    ];
+  }
+
+  /** 29×29 template (left half = 15 columns) */
+  #template29x29() {
+    return [
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,1,1,0,1,1,1,1,0,1,1,1,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,1,1,0,1,0,1,1,1,0,1,1,0,1],
+      [1,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+      [1,1,1,1,0,1,1,1,0,1,0,1,1,1,1],
+      [0,0,0,0,0,0,0,1,0,1,0,0,0,0,0],
+      [1,1,1,1,0,1,0,0,0,0,0,1,1,1,1],
+      [0,0,0,1,0,1,0,1,1,1,0,1,0,0,0],
+      [1,1,0,0,0,0,0,0,0,0,0,0,0,1,1],
+      [0,0,0,1,0,1,0,1,1,1,0,1,0,0,0],
+      [1,1,1,1,0,1,0,0,0,0,0,1,1,1,1],
+      [0,0,0,0,0,0,0,1,0,1,0,0,0,0,0],
+      [1,1,1,1,0,1,1,1,0,1,1,1,0,1,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,1,1,0,1,0,1,1,1,0,1,1,0,1],
+      [1,0,0,1,0,0,0,0,0,0,0,0,0,0,1],
+      [1,1,0,0,0,1,0,1,0,1,0,1,1,0,1],
+      [1,0,0,1,0,1,0,1,0,1,0,0,0,0,1],
+      [1,0,1,1,0,0,0,0,0,0,0,1,1,0,1],
+      [1,0,0,0,0,1,0,1,1,1,0,0,0,0,1],
+      [1,0,1,1,1,1,0,0,0,0,0,1,1,0,1],
+      [1,0,0,0,0,0,0,1,0,1,0,0,0,0,1],
+      [1,0,1,0,1,1,0,1,0,1,1,1,0,1,1],
+      [1,0,1,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,1,1,0,1,1,1,0,1,1,1,1,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    ];
+  }
+
+  /** Fallback procedural generation for non-standard sizes */
+  #createProceduralMap() {
+    const map = this.#createEmptyMap();
+
+    this.#carveCorridors(map);
+    this.#mirrorLeftToRight(map);
+    this.#addLoops(map);
+    this.#removeDeadEnds(map);
+    this.#carveGhostHouse(map);
+    this.#ensureConnectivity(map);
+
+    return map;
   }
 
   // ── Map Creation ───────────────────────────────────────────

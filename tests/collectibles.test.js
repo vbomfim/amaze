@@ -243,8 +243,8 @@ console.log('\n🧪 CollectibleManager — Collection Detection');
   const cm = new CollectibleManager(dotPos, [], []);
 
   // Just outside proximity
-  const item = cm.checkCollection(5.6, 5.6);
-  assert(item === null, 'does not collect beyond 0.5 tile proximity');
+  const item = cm.checkCollection(6.2, 6.2);
+  assert(item === null, 'does not collect beyond 0.6 tile proximity');
 }
 
 {

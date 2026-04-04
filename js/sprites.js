@@ -13,18 +13,18 @@
  * Each type has: color, size (world units), shape type.
  */
 const SPRITE_TYPES = {
-  dot:              { color: '#ffcc00', size: 0.1,  shape: 'circle' },
-  power_pellet:     { color: '#ffee00', size: 0.3,  shape: 'circle' },
-  apple:            { color: '#ff3333', size: 0.15, shape: 'diamond' },
-  cherry:           { color: '#cc0000', size: 0.15, shape: 'circles' },
-  pizza:            { color: '#ff8800', size: 0.15, shape: 'triangle' },
-  cupcake:          { color: '#ff66aa', size: 0.15, shape: 'rectangle' },
-  ghost_blinky:     { color: '#ff0000', size: 0.45, shape: 'diamond' },
-  ghost_pinky:      { color: '#ffb8ff', size: 0.45, shape: 'diamond' },
-  ghost_inky:       { color: '#00ffff', size: 0.45, shape: 'diamond' },
-  ghost_clyde:      { color: '#ffb852', size: 0.45, shape: 'diamond' },
-  ghost_frightened: { color: '#0000ff', size: 0.45, shape: 'diamond' },
-  ghost_eaten:      { color: '#ffffff', size: 0.3,  shape: 'eyes' },
+  dot:              { color: '#ffcc00', size: 0.06, shape: 'circle', yOffset: 1.5 },
+  power_pellet:     { color: '#ffee00', size: 0.2,  shape: 'circle', yOffset: 1.0 },
+  apple:            { color: '#ff3333', size: 0.12, shape: 'diamond', yOffset: 1.0 },
+  cherry:           { color: '#cc0000', size: 0.12, shape: 'circles', yOffset: 1.0 },
+  pizza:            { color: '#ff8800', size: 0.12, shape: 'triangle', yOffset: 1.0 },
+  cupcake:          { color: '#ff66aa', size: 0.12, shape: 'rectangle', yOffset: 1.0 },
+  ghost_blinky:     { color: '#ff0000', size: 0.45, shape: 'diamond', yOffset: 0 },
+  ghost_pinky:      { color: '#ffb8ff', size: 0.45, shape: 'diamond', yOffset: 0 },
+  ghost_inky:       { color: '#00ffff', size: 0.45, shape: 'diamond', yOffset: 0 },
+  ghost_clyde:      { color: '#ffb852', size: 0.45, shape: 'diamond', yOffset: 0 },
+  ghost_frightened: { color: '#0000ff', size: 0.45, shape: 'diamond', yOffset: 0 },
+  ghost_eaten:      { color: '#ffffff', size: 0.3,  shape: 'eyes', yOffset: 0 },
 };
 
 /** Minimum distance to render a sprite (avoids division by near-zero) */
@@ -115,8 +115,9 @@ class SpriteRenderer {
     const spriteScreenSize = Math.floor((typeDef.size / dist) * projDist);
     if (spriteScreenSize < 1) return;
 
-    // Screen Y centered at horizon
-    const screenY = Math.floor(this.height / 2 - spriteScreenSize / 2);
+    // Screen Y — centered at horizon, offset downward for floor items
+    const yOff = typeDef.yOffset || 0;
+    const screenY = Math.floor(this.height / 2 - spriteScreenSize / 2 + yOff * spriteScreenSize);
 
     // Distance shading (match wall shading)
     const shade = Math.max(0.15, 1.0 - dist / 12);

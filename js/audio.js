@@ -24,6 +24,7 @@ class AudioManager {
     this._AudioContextClass = options.AudioContextClass || null;
     this._muted = typeof options.muted === 'boolean' ? options.muted : false;
     this._ctx = null;
+    this._wakaToggle = false;
 
     // Active looping sound references for stop control
     this._powerUpSirenNodes = null;
@@ -181,27 +182,35 @@ class AudioManager {
   playWakaWaka() {
     if (!this.#canPlay()) return;
     const t = this._ctx.currentTime;
-    // First waka
-    const { osc: osc1, gain: gain1 } = this.#createOscGain('square', 200, 0.15);
-    gain1.gain.setValueAtTime(0.15, t);
-    gain1.gain.linearRampToValueAtTime(0, t + 0.06);
-    osc1.start(t);
-    osc1.stop(t + 0.06);
-    // Second waka
-    const { osc: osc2, gain: gain2 } = this.#createOscGain('square', 300, 0.15);
-    gain2.gain.setValueAtTime(0.15, t + 0.06);
-    gain2.gain.linearRampToValueAtTime(0, t + 0.12);
-    osc2.start(t + 0.06);
-    osc2.stop(t + 0.12);
+    // Alternating chomping sound — frequency sweeps down then up
+    this._wakaToggle = !this._wakaToggle;
+
+    const baseFreq = this._wakaToggle ? 260 : 330;
+    const endFreq = this._wakaToggle ? 80 : 100;
+
+    const osc = this._ctx.createOscillator();
+    const gain = this._ctx.createGain();
+    osc.connect(gain);
+    gain.connect(this._ctx.destination);
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(baseFreq, t);
+    osc.frequency.exponentialRampToValueAtTime(endFreq, t + 0.08);
+
+    gain.gain.setValueAtTime(0.5, t);
+    gain.gain.setValueAtTime(0.5, t + 0.04);
+    gain.gain.linearRampToValueAtTime(0, t + 0.09);
+
+    osc.start(t);
+    osc.stop(t + 0.09);
   }
 
   /** Descending sawtooth 500→200Hz single sweep while active [Fix 6] — renamed from playPowerUpSiren */
   playPowerUpSiren() {
     if (!this.#canPlay()) return;
     this.stopPowerUpSiren();
-    const { osc, gain } = this.#createOscGain('sawtooth', 500, 0.1);
+    const { osc, gain } = this.#createOscGain('sawtooth', 500, 0.25);
     const t = this._ctx.currentTime;
-    // Single descending frequency sweep (not a true siren loop)
     osc.frequency.setValueAtTime(500, t);
     osc.frequency.linearRampToValueAtTime(200, t + 2);
     osc.start(t);
@@ -221,12 +230,12 @@ class AudioManager {
 
   /** Quick ascending sine 400→1200Hz, 100ms */
   playGhostEaten() {
-    this.#playTone({ type: 'sine', freq: 400, freqEnd: 1200, duration: 0.1, volume: 0.2 });
+    this.#playTone({ type: 'sine', freq: 400, freqEnd: 1200, duration: 0.15, volume: 0.4 });
   }
 
   /** Descending sine 600→100Hz, 1 second, fade out */
   playDeath() {
-    this.#playTone({ type: 'sine', freq: 600, freqEnd: 100, duration: 1.0, volume: 0.3 });
+    this.#playTone({ type: 'sine', freq: 600, freqEnd: 100, duration: 1.0, volume: 0.5 });
   }
 
   /** Longer ascending jingle: C-D-E-F-G-A-B-C, 100ms each */
@@ -247,7 +256,7 @@ class AudioManager {
   playGhostSiren() {
     if (!this.#canPlay()) return;
     this.stopGhostSiren();
-    const { osc, gain } = this.#createOscGain('sine', 150, 0.04);
+    const { osc, gain } = this.#createOscGain('sine', 150, 0.12);
     osc.start(this._ctx.currentTime);
     this._ghostSirenNodes = { osc, gain };
   }

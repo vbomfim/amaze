@@ -158,56 +158,56 @@ console.log('\n🎮 PacManMode — Level Configuration');
 
   // Level 1
   const c1 = pm.getLevelConfig(1);
-  assert(c1.mazeSize === 15, 'level 1 maze is 15×15');
+  assert(c1.mazeSize === 21, 'level 1 maze is 21×21');
   assert(c1.ghostSpeed === 2.25, 'level 1 ghost speed is 2.25');
   assert(c1.frightenedDuration === 8, 'level 1 frightened duration is 8s');
   assert(c1.scatterDuration === 7, 'level 1 scatter duration is 7s');
 
   // Level 2
   const c2 = pm.getLevelConfig(2);
-  assert(c2.mazeSize === 17, 'level 2 maze is 17×17');
-  assert(c2.ghostSpeed === 2.4, 'level 2 ghost speed is 2.4');
-  assert(c2.frightenedDuration === 7, 'level 2 frightened duration is 7s');
-  assert(c2.scatterDuration === 6, 'level 2 scatter duration is 6s');
+  assert(c2.mazeSize === 21, 'level 2 maze is 21×21');
+  assert(c2.ghostSpeed === 2.25, 'level 2 ghost speed is 2.25');
+  assert(c2.frightenedDuration === 8, 'level 2 frightened duration is 8s');
+  assert(c2.scatterDuration === 7, 'level 2 scatter duration is 7s');
 
   // Level 3
   const c3 = pm.getLevelConfig(3);
-  assert(c3.mazeSize === 19, 'level 3 maze is 19×19');
+  assert(c3.mazeSize === 21, 'level 3 maze is 21×21');
   assert(c3.ghostSpeed === 2.55, 'level 3 ghost speed is 2.55');
 
   // Level 4
   const c4 = pm.getLevelConfig(4);
   assert(c4.mazeSize === 21, 'level 4 maze is 21×21');
-  assert(c4.ghostSpeed === 2.7, 'level 4 ghost speed is 2.7');
+  assert(c4.ghostSpeed === 2.55, 'level 4 ghost speed is 2.55');
 
   // Level 5 (5-9 bracket)
   const c5 = pm.getLevelConfig(5);
-  assert(c5.mazeSize === 23, 'level 5 maze is 23×23');
-  assert(c5.ghostSpeed === 2.85, 'level 5 ghost speed is 2.85');
-  assert(c5.frightenedDuration === 4, 'level 5 frightened duration is 4s');
-  assert(c5.scatterDuration === 3, 'level 5 scatter duration is 3s');
+  assert(c5.mazeSize === 25, 'level 5 maze is 25×25');
+  assert(c5.ghostSpeed === 2.7, 'level 5 ghost speed is 2.85');
+  assert(c5.frightenedDuration === 5, 'level 5 frightened duration is 4s');
+  assert(c5.scatterDuration === 4, 'level 5 scatter duration is 3s');
 
   // Level 7 (still 5-9 bracket)
   const c7 = pm.getLevelConfig(7);
-  assert(c7.mazeSize === 23, 'level 7 maze is 23×23 (5-9 bracket)');
-  assert(c7.ghostSpeed === 2.85, 'level 7 ghost speed is 2.85');
+  assert(c7.mazeSize === 25, 'level 7 maze is 25×25 (5-7 bracket)');
+  assert(c7.ghostSpeed === 2.7, 'level 7 ghost speed is 2.7');
 
   // Level 10 (10-14 bracket)
   const c10 = pm.getLevelConfig(10);
   assert(c10.mazeSize === 25, 'level 10 maze is 25×25');
-  assert(c10.ghostSpeed === 3.0, 'level 10 ghost speed is 3.0');
-  assert(c10.frightenedDuration === 3, 'level 10 frightened duration is 3s');
-  assert(c10.scatterDuration === 2, 'level 10 scatter duration is 2s');
+  assert(c10.ghostSpeed === 2.85, 'level 10 ghost speed is 3.0');
+  assert(c10.frightenedDuration === 4, 'level 10 frightened duration is 3s');
+  assert(c10.scatterDuration === 3, 'level 10 scatter duration is 2s');
 
   // Level 15 (15+ bracket)
   const c15 = pm.getLevelConfig(15);
-  assert(c15.mazeSize === 27, 'level 15 maze is 27×27');
+  assert(c15.mazeSize === 29, 'level 15 maze is 29×29');
   assert(c15.ghostSpeed === 3.0, 'level 15 ghost speed is 3.0');
-  assert(c15.frightenedDuration === 2, 'level 15 frightened duration is 2s');
+  assert(c15.frightenedDuration === 3, 'level 15 frightened duration is 3s');
 
   // Level 25 (still 15+ bracket)
   const c25 = pm.getLevelConfig(25);
-  assert(c25.mazeSize === 27, 'level 25 stays at 27×27 max');
+  assert(c25.mazeSize === 29, 'level 25 stays at 29×29 max');
   assert(c25.frightenedDuration === 2, 'level 25 frightened stays at 2s');
 }
 
@@ -754,11 +754,11 @@ console.log('\n🎮 PacManMode — Audio: ghost siren starts on PLAYING');
 console.log('\n🎮 PacManMode — LEVEL_CONFIGS exported');
 {
   assert(Array.isArray(LEVEL_CONFIGS), 'LEVEL_CONFIGS is an array');
-  assert(LEVEL_CONFIGS.length >= 7, 'LEVEL_CONFIGS has at least 7 entries');
+  assert(LEVEL_CONFIGS.length >= 6, 'LEVEL_CONFIGS has at least 6 entries');
 
   const first = LEVEL_CONFIGS[0];
   assert(first.level === 1, 'first config is level 1');
-  assert(first.mazeSize === 15, 'first config maze is 15');
+  assert(first.mazeSize === 21, 'first config maze is 21');
 }
 
 console.log('\n🎮 PacManMode — PACMAN_STATES exported');

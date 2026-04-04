@@ -156,6 +156,11 @@ class GameStateManager {
     this.#gameState = 'menu';
   }
 
+  /** Transition to PAC-MAN mode. */
+  goToPacMan() {
+    this.#gameState = 'pacman';
+  }
+
   // ── Level Configuration ────────────────────────────────────
 
   /**

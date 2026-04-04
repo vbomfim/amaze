@@ -60,13 +60,12 @@ const STARTING_LIVES = 3;
  * Each entry defines the thresholds — use the highest entry where level >= entry.level.
  */
 const LEVEL_CONFIGS = [
-  { level: 1,  mazeSize: 15, ghostSpeed: 2.25, frightenedDuration: 8, scatterDuration: 7 },
-  { level: 2,  mazeSize: 17, ghostSpeed: 2.4,  frightenedDuration: 7, scatterDuration: 6 },
-  { level: 3,  mazeSize: 19, ghostSpeed: 2.55, frightenedDuration: 6, scatterDuration: 5 },
-  { level: 4,  mazeSize: 21, ghostSpeed: 2.7,  frightenedDuration: 5, scatterDuration: 4 },
-  { level: 5,  mazeSize: 23, ghostSpeed: 2.85, frightenedDuration: 4, scatterDuration: 3 },
-  { level: 10, mazeSize: 25, ghostSpeed: 3.0,  frightenedDuration: 3, scatterDuration: 2 },
-  { level: 15, mazeSize: 27, ghostSpeed: 3.0,  frightenedDuration: 2, scatterDuration: 2 },
+  { level: 1,  mazeSize: 21, ghostSpeed: 2.25, frightenedDuration: 8, scatterDuration: 7 },
+  { level: 3,  mazeSize: 21, ghostSpeed: 2.55, frightenedDuration: 6, scatterDuration: 5 },
+  { level: 5,  mazeSize: 25, ghostSpeed: 2.7,  frightenedDuration: 5, scatterDuration: 4 },
+  { level: 8,  mazeSize: 25, ghostSpeed: 2.85, frightenedDuration: 4, scatterDuration: 3 },
+  { level: 12, mazeSize: 29, ghostSpeed: 3.0,  frightenedDuration: 3, scatterDuration: 2 },
+  { level: 16, mazeSize: 29, ghostSpeed: 3.0,  frightenedDuration: 2, scatterDuration: 2 },
 ];
 
 // ── PacManMode Class ───────────────────────────────────────────
@@ -389,12 +388,155 @@ class PacManMode {
   #renderGameView() {
     if (!this.renderer || !this.player || !this.tileMap) return;
 
-    // Render 3D raycasted view (no exit portal in PAC-MAN mode)
     this.renderer.render(this.player, this.tileMap, -1, -1, {});
 
-    // Render sprites (collectibles + ghosts)
     const sprites = this.getAllSprites();
     this.spriteRenderer.renderSprites(this.player, sprites, this.renderer.depthBuffer);
+
+    // PAC-MAN minimap with ghosts and collectibles
+    this.#renderPacMinimap();
+  }
+
+  /** Render PAC-MAN minimap showing maze, player, ghosts, dots, and pellets. */
+  /** Render arcade-style PAC-MAN minimap — blue outlined walls, dots, ghosts. */
+  #renderPacMinimap() {
+    const ctx = this.renderer.ctx;
+    const map = this.tileMap;
+    if (!map) return;
+
+    const rows = map.length;
+    const cols = map[0].length;
+    const maxPx = Math.min(this.canvas.width * 0.22, this.canvas.height * 0.35);
+    const cs = Math.max(3, Math.floor(maxPx / Math.max(rows, cols)));
+    const pad = 8;
+    const topM = 35;
+    const mapW = cols * cs;
+    const mapH = rows * cs;
+
+    ctx.save();
+
+    // Black background
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(pad - 2, topM - 2, mapW + 4, mapH + 4);
+
+    // Draw walls — blue fill with brighter edges facing corridors
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (map[r][c] !== 1) continue;
+        const x = pad + c * cs;
+        const y = topM + r * cs;
+
+        const adjOpen = (r > 0 && map[r - 1][c] === 0) ||
+                        (r < rows - 1 && map[r + 1][c] === 0) ||
+                        (c > 0 && map[r][c - 1] === 0) ||
+                        (c < cols - 1 && map[r][c + 1] === 0);
+
+        if (adjOpen) {
+          ctx.fillStyle = '#1111aa';
+          ctx.fillRect(x, y, cs, cs);
+          ctx.strokeStyle = '#4444ff';
+          ctx.lineWidth = 1;
+          if (r > 0 && map[r - 1][c] === 0) { ctx.beginPath(); ctx.moveTo(x, y + 0.5); ctx.lineTo(x + cs, y + 0.5); ctx.stroke(); }
+          if (r < rows - 1 && map[r + 1][c] === 0) { ctx.beginPath(); ctx.moveTo(x, y + cs - 0.5); ctx.lineTo(x + cs, y + cs - 0.5); ctx.stroke(); }
+          if (c > 0 && map[r][c - 1] === 0) { ctx.beginPath(); ctx.moveTo(x + 0.5, y); ctx.lineTo(x + 0.5, y + cs); ctx.stroke(); }
+          if (c < cols - 1 && map[r][c + 1] === 0) { ctx.beginPath(); ctx.moveTo(x + cs - 0.5, y); ctx.lineTo(x + cs - 0.5, y + cs); ctx.stroke(); }
+        } else {
+          ctx.fillStyle = '#0a0a2a';
+          ctx.fillRect(x, y, cs, cs);
+        }
+      }
+    }
+
+    // Dots — small cream/pink squares like the arcade
+    if (this.collectibles) {
+      const time = performance.now() / 1000;
+      for (const [_key, item] of this.collectibles.items) {
+        if (!item.active) continue;
+        const cx = pad + item.col * cs + cs / 2;
+        const cy = topM + item.row * cs + cs / 2;
+
+        if (item.type === 'dot') {
+          ctx.fillStyle = '#ffcc66';
+          ctx.beginPath();
+          ctx.arc(cx, cy, Math.max(1.5, cs * 0.2), 0, Math.PI * 2);
+          ctx.fill();
+        } else if (item.type === 'power_pellet') {
+          const pulse = 0.5 + 0.5 * Math.sin(time * 4);
+          ctx.globalAlpha = pulse;
+          ctx.fillStyle = '#ffb8a0';
+          ctx.beginPath();
+          ctx.arc(cx, cy, Math.max(2, cs * 0.4), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1.0;
+        } else {
+          ctx.fillStyle = '#ff4444';
+          const fs = Math.max(2, Math.floor(cs * 0.4));
+          ctx.fillRect(cx - fs / 2, cy - fs / 2, fs, fs);
+        }
+      }
+    }
+
+    // Ghosts — classic ghost shape (dome + wavy skirt)
+    if (this.ghostManager) {
+      for (const ghost of this.ghostManager.ghosts) {
+        const gx = pad + ghost.x * cs;
+        const gy = topM + ghost.y * cs;
+        const gc = ghost.state === 'frightened' ? '#2222ff' :
+                   ghost.state === 'eaten' ? '#ffffff' :
+                   ghost.id === 'blinky' ? '#ff0000' :
+                   ghost.id === 'pinky' ? '#ffb8ff' :
+                   ghost.id === 'inky' ? '#00ffff' : '#ffb852';
+        const gr = Math.max(3, cs * 0.45);
+        ctx.fillStyle = gc;
+        // Dome (top half circle)
+        ctx.beginPath();
+        ctx.arc(gx, gy - gr * 0.2, gr, Math.PI, 0);
+        // Wavy skirt (3 bumps at bottom)
+        const bot = gy - gr * 0.2 + gr;
+        ctx.lineTo(gx + gr, bot);
+        const bumps = 3;
+        for (let b = bumps; b > 0; b--) {
+          const bx = gx + gr - (b - 0.5) * (2 * gr / bumps);
+          const bx2 = gx + gr - b * (2 * gr / bumps);
+          ctx.quadraticCurveTo(bx, bot + gr * 0.4, bx2, bot);
+        }
+        ctx.closePath();
+        ctx.fill();
+        // Eyes (white dots with dark pupils)
+        if (ghost.state !== 'frightened') {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(gx - gr * 0.35, gy - gr * 0.4, gr * 0.25, gr * 0.25);
+          ctx.fillRect(gx + gr * 0.1, gy - gr * 0.4, gr * 0.25, gr * 0.25);
+          ctx.fillStyle = '#000022';
+          ctx.fillRect(gx - gr * 0.25, gy - gr * 0.35, gr * 0.15, gr * 0.15);
+          ctx.fillRect(gx + gr * 0.2, gy - gr * 0.35, gr * 0.15, gr * 0.15);
+        }
+      }
+    }
+
+    // Player — PAC-MAN shape (circle with animated mouth facing movement direction)
+    const px = pad + this.player.x * cs;
+    const py = topM + this.player.y * cs;
+    const pr = Math.max(3, cs * 0.45);
+    const angle = this.player.angle;
+    // Animated mouth opening (chomp chomp)
+    const time = performance.now() / 1000;
+    const mouthOpen = 0.15 + 0.25 * Math.abs(Math.sin(time * 10));
+    ctx.fillStyle = '#ffff00';
+    ctx.beginPath();
+    ctx.arc(px, py, pr, angle + mouthOpen, angle + Math.PI * 2 - mouthOpen);
+    ctx.lineTo(px, py);
+    ctx.closePath();
+    ctx.fill();
+    // Eye
+    const eyeDist = pr * 0.35;
+    const eyeAngle = angle - 0.5;
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(px + Math.cos(eyeAngle) * eyeDist, py + Math.sin(eyeAngle) * eyeDist, pr * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
   }
 
   /** Render PAC-MAN HUD overlay. */

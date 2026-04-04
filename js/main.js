@@ -407,18 +407,27 @@ class Game {
    * Enter PAC-MAN mode — create PacManMode instance and switch state.
    */
   #enterPacManMode() {
-    if (!this.pacmanMode) {
-      this.pacmanMode = new PacManMode(this.canvas, this.audioManager, {
-        storage: localStorage,
-        onExit: () => {
-          this.gsm.gameState = 'menu';
-          this._menuSelection = 0;
-          if (this.player) this.player.enableMouseLook = false;
-        },
-      });
+    try {
+      if (!this.pacmanMode) {
+        this.pacmanMode = new PacManMode(this.canvas, this.audioManager, {
+          storage: localStorage,
+          onExit: () => {
+            this.gsm.goToMenu();
+            this._menuSelection = 0;
+            if (this.player) this.player.enableMouseLook = false;
+          },
+        });
+      }
+      this.pacmanMode.start();
+      this.gsm.goToPacMan();
+    } catch (err) {
+      // Temporarily log to help debug
+      const ctx = this.canvas.getContext('2d');
+      ctx.fillStyle = '#ff0000';
+      ctx.font = '14px monospace';
+      ctx.fillText('PAC-MAN Error: ' + err.message, 20, 40);
+      ctx.fillText(err.stack ? err.stack.split('\n')[1] : '', 20, 60);
     }
-    this.pacmanMode.start();
-    this.gsm.gameState = 'pacman';
   }
 
   // ── Level Complete Key Handling [AC14] ─────────────────────

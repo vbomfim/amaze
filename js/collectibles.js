@@ -38,7 +38,7 @@ const FOOD_WEIGHTS = [
 const TOTAL_FOOD_WEIGHT = FOOD_WEIGHTS.reduce((sum, fw) => sum + fw.weight, 0);
 
 /** Proximity threshold for item collection (in tiles) */
-const COLLECTION_RADIUS = 0.5;
+const COLLECTION_RADIUS = 0.6;
 
 /** Animation speed for pulsing/spinning effects */
 const ANIM_SPEED = 1.5;
@@ -158,8 +158,8 @@ class CollectibleManager {
     for (const item of this.items.values()) {
       if (!item.active) continue;
 
-      const dRow = Math.abs(playerRow - item.row);
-      const dCol = Math.abs(playerCol - item.col);
+      const dRow = Math.abs(playerRow - (item.row + 0.5));
+      const dCol = Math.abs(playerCol - (item.col + 0.5));
 
       if (dRow < COLLECTION_RADIUS && dCol < COLLECTION_RADIUS) {
         item.active = false;
