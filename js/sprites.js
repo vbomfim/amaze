@@ -31,7 +31,7 @@ const SPRITE_TYPES = {
 const MIN_SPRITE_DIST = 0.2;
 
 /** Maximum distance to render a sprite (culling far sprites) — configurable for mobile */
-let MAX_SPRITE_DIST = 24;
+const MAX_SPRITE_DIST = 24;
 
 class SpriteRenderer {
   /**

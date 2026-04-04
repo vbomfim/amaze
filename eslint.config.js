@@ -16,6 +16,8 @@ export default [
         AbortController: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",
+        navigator: "readonly",
+        screen: "readonly",
         Map: "readonly",
         Set: "readonly",
         Date: "readonly",

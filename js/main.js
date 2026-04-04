@@ -31,7 +31,6 @@ import {
   isPortrait,
   TouchInput,
   getMobileRayScale,
-  getMobileSpriteMaxDist,
 } from './touch-input.js';
 
 /** Game configuration constants */
