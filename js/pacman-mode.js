@@ -450,7 +450,7 @@ class PacManMode {
     // Dots — small cream/pink squares like the arcade
     if (this.collectibles) {
       const time = performance.now() / 1000;
-      for (const [_key, item] of this.collectibles.items) {
+      for (const [, item] of this.collectibles.items) {
         if (!item.active) continue;
         const cx = pad + item.col * cs + cs / 2;
         const cy = topM + item.row * cs + cs / 2;

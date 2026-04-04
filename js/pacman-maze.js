@@ -125,7 +125,7 @@ class PacManMazeGenerator {
   }
 
   /** Find ghost house bounds in the map (region of 2s or known position) */
-  #findGhostHouse(map) {
+  #findGhostHouse(_map) {
     const midR = Math.floor(this.height / 2);
     const midC = Math.floor(this.width / 2);
     // Ghost house is 5 wide × 3 tall centered in the map
