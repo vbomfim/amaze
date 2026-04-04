@@ -141,9 +141,11 @@ class Game {
     let width, height;
 
     if (this._isMobile) {
-      // Mobile: fill full viewport, no aspect ratio constraint
-      width = window.innerWidth;
-      height = window.innerHeight;
+      // Mobile: fill full viewport using visual viewport (handles URL bar)
+      const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      width = vw;
+      height = vh;
     } else {
       // Desktop: maintain 16:9 aspect ratio
       width = maxW;
@@ -732,28 +734,34 @@ class Game {
 
     switch (state) {
       case 'menu':
+        if (this._touchInput) this._touchInput.enabled = false;
         this.#renderMenu();
         break;
 
       case 'playing':
         if (this.player) this.player.enableMouseLook = true;
+        if (this._touchInput) this._touchInput.enabled = true;
         this.#updatePlaying(timestamp);
         break;
 
       case 'paused':
         if (this.player) this.player.enableMouseLook = false;
+        if (this._touchInput) this._touchInput.enabled = false;
         this.#renderPaused();
         break;
 
       case 'levelComplete':
+        if (this._touchInput) this._touchInput.enabled = false;
         this.#renderLevelComplete();
         break;
 
       case 'victory':
+        if (this._touchInput) this._touchInput.enabled = false;
         this.#renderVictory();
         break;
 
       case 'levelSelect':
+        if (this._touchInput) this._touchInput.enabled = false;
         this.#renderLevelSelect();
         break;
 

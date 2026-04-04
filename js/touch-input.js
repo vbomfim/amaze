@@ -235,6 +235,9 @@ class TouchInput {
 
     /** Map of active touch identifiers to joystick assignment ('move' | 'look') */
     this._touchMap = new Map();
+
+    /** Whether touch controls are active (disabled during menus) */
+    this.enabled = false;
   }
 
   /** Whether any touch is currently active */
@@ -356,23 +359,32 @@ class TouchInput {
     const opts = { passive: false, ...(options.signal ? { signal: options.signal } : {}) };
 
     canvas.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      this.handleTouchStart(e.changedTouches);
+      // Only prevent default during gameplay (allows click events for menus)
+      if (this.enabled) {
+        e.preventDefault();
+        this.handleTouchStart(e.changedTouches);
+      }
     }, opts);
 
     canvas.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      this.handleTouchMove(e.changedTouches);
+      e.preventDefault(); // Always prevent scroll
+      if (this.enabled) {
+        this.handleTouchMove(e.changedTouches);
+      }
     }, opts);
 
     canvas.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      this.handleTouchEnd(e.changedTouches);
+      if (this.enabled) {
+        e.preventDefault();
+        this.handleTouchEnd(e.changedTouches);
+      }
     }, opts);
 
     canvas.addEventListener('touchcancel', (e) => {
-      e.preventDefault();
-      this.handleTouchCancel(e.changedTouches);
+      if (this.enabled) {
+        e.preventDefault();
+        this.handleTouchCancel(e.changedTouches);
+      }
     }, opts);
   }
 }
